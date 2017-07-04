@@ -297,8 +297,8 @@ class Speaker:
 class EmbeddingExtractor:
     ''' Build embeddings for mentions '''
     def __init__(self, model_path):
-        self.static_embeddings = self.load_embeddings_from_file(model_path + "static_word")
-        self.tuned_embeddings = self.load_embeddings_from_file(model_path + "tuned_word")
+        self.static_embeddings, self.static_voc = self.load_embeddings_from_file(model_path + "static_word")
+        self.tuned_embeddings, self.tuned_voc = self.load_embeddings_from_file(model_path + "tuned_word")
         self.fallback = self.static_embeddings.get(UNKNOWN_WORD)
 
         self.shape = self.static_embeddings[UNKNOWN_WORD].shape
@@ -308,11 +308,13 @@ class EmbeddingExtractor:
     @staticmethod
     def load_embeddings_from_file(name):
         embeddings = {}
+        voc = {}
         mat = np.load(name+"_embeddings.npy")
         with open(name+"_vocabulary.txt") as f:
             for i, line in enumerate(f):
                 embeddings[line.strip()] = mat[i, :]
-        return embeddings
+                voc[line.strip()] = i
+        return embeddings, voc
  
     @staticmethod
     def normalize_word(w):
@@ -382,91 +384,49 @@ class EmbeddingExtractor:
         mention_lefts = mention.doc[max(mention.start-5, sent.start):mention.start]
         mention_rights = mention.doc[mention.end:min(mention.end+5, sent.end)]
         head = mention.root.head
-#        if head.lower_ == "is":
-#            if mention.root.dep_ == "nsubj":
-#                head = next(filter(lambda tok: tok.head == head and tok.dep_ == "attr", sent), head)
-#            else:
-#                head = None
+    #    if head.lower_ == "is":
+    #        if mention.root.dep_ == "nsubj":
+    #            head = next(filter(lambda tok: tok.head == head and tok.dep_ == "attr", sent), head)
+    #        else:
+    #            head = None
         spans = [self.get_average_embedding(mention),
-                self.get_average_embedding(mention_lefts),
-                self.get_average_embedding(mention_rights),
-                self.get_average_embedding(sent),
-                (str(doc_embedding[0:8]) + "...", doc_embedding)]
+                 self.get_average_embedding(mention_lefts),
+                 self.get_average_embedding(mention_rights),
+                 self.get_average_embedding(sent),
+                 (str(doc_embedding[0:8]) + "...", doc_embedding)]
         words = [self.get_word_embedding(mention.root),
-                self.get_word_embedding(mention[0]),
-                self.get_word_embedding(mention[-1]),
-                self.get_word_in_sentence(mention.start-1, sent),
-                self.get_word_in_sentence(mention.end, sent),
-                self.get_word_in_sentence(mention.start-2, sent),
-                self.get_word_in_sentence(mention.end+1, sent),
-                self.get_word_embedding(head)]
+                 self.get_word_embedding(mention[0]),
+                 self.get_word_embedding(mention[-1]),
+                 self.get_word_in_sentence(mention.start-1, sent),
+                 self.get_word_in_sentence(mention.end, sent),
+                 self.get_word_in_sentence(mention.start-2, sent),
+                 self.get_word_in_sentence(mention.end+1, sent),
+                 self.get_word_embedding(head)]
         spans_embeddings_ = {"00_mention": spans[0][0],
-                            "01_mention_left": spans[1][0],
-                            "02_mention_right": spans[2][0],
-                            "03_sentence": spans[3][0],
-                            "04_doc": spans[4][0]}
-        words_embeddings_ = {"01_mention_head": l[5][0],
-                            "02_mention_first_word": l[6][0],
-                            "03_mention_last_word": l[7][0],
-                            "04_previous_word": l[8][0],
-                            "05_next_word": l[9][0],
-                            "06_prev_prev_word": l[10][0],
-                            "07_next_next_word": l[11][0],
-                            "08_Mention_root_head": l[12][0]}
-        return spans_embeddings_,
-               words_embeddings_,
-               np.concatenate(list(em[1] for em in spans), axis=0)[: np.newaxis],
-               np.concatenate(list(em[1] for em in words), axis=0)[: np.newaxis]
+                             "01_mention_left": spans[1][0],
+                             "02_mention_right": spans[2][0],
+                             "03_sentence": spans[3][0],
+                             "04_doc": spans[4][0]}
+        words_embeddings_ = {"01_mention_head": words[0][0],
+                             "02_mention_first_word": words[1][0],
+                             "03_mention_last_word": words[2][0],
+                             "04_previous_word": words[3][0],
+                             "05_next_word": words[4][0],
+                             "06_prev_prev_word": words[5][0],
+                             "07_next_next_word": words[6][0],
+                             "08_Mention_root_head": words[7][0]}
+        return (spans_embeddings_,
+                words_embeddings_,
+                np.concatenate(list(em[1] for em in spans), axis=0)[: np.newaxis],
+                np.concatenate(list(em[1] for em in words), axis=0)[: np.newaxis])
 
-class FeaturesExtractor:
-    '''
-    Build features for mentions
-    '''
-    def __init__(self, docs=None, consider_speakers=False):
-        self.docs = docs
-        self.consider_speakers = consider_speakers
-
-    def set_docs(self, docs):
-        self.docs = docs
-
-    def get_anaphoricity_features(self, mention):
-        ''' Features for anaphoricity test (signle mention features + genre if conll)'''
-        return np.concatenate([mention.features,
-                               self.docs.genre], axis=0)
-
-    def get_pair_features(self, m1, m2):
-        ''' Features for pair of mentions (same speakers, speaker mentioned, string match)'''
-        features_ = {"0_same_speaker": 1 if self.consider_speakers and m1.speaker == m2.speaker else 0,
-                     "1_ant_match_mention_speaker": 1 if self.consider_speakers and m2.speaker_match_mention(m1) else 0,
-                     "2_mention_match__speaker": 1 if self.consider_speakers and m1.speaker_match_mention(m2) else 0,
-                     "3_heads_agree": 1 if m1.heads_agree(m2) else 0,
-                     "4_exact_string_match": 1 if m1.exact_match(m2) else 0,
-                     "5_relaxed_string_match": 1 if m1.relaxed_match(m2) else 0,
-                     "6_sentence_distance": m2.utterances_sent - m1.utterances_sent,
-                     "7_mention_index_distance": m2.index - m1.index - 1,
-                     "8_overlapping": 1 if (m1.utterances_sent == m2.utterances_sent and m1.end > m2.start) else 0,
-                     "m1_features": m1.features_,
-                     "m2_features": m2.features_}
-        pairwise_features = [np.array([features_["0_same_speaker"],
-                                       features_["1_ant_match_mention_speaker"],
-                                       features_["2_mention_match__speaker"],
-                                       features_["3_heads_agree"],
-                                       features_["4_exact_string_match"],
-                                       features_["5_relaxed_string_match"]]),
-                             encode_distance(features_["6_sentence_distance"]),
-                             encode_distance(features_["7_mention_index_distance"]),
-                             np.array(features_["8_overlapping"], ndmin=1),
-                             m1.features,
-                             m2.features,
-                             self.docs.genre]
-        return (features_, np.concatenate(pairwise_features, axis=0))
-
-class Docs:
+class Data:
     '''
     Main data class with list of utterances, mentions and speakers
     Also pre-compute mentions embeddings and features
     '''
-    def __init__(self, nlp, model_path=None, conll=False, utterances=None, utterances_speaker=None, speakers_names=None, use_no_coref_list=True, debug=False):
+    def __init__(self, nlp, model_path=None, conll=None, utterances=None, utterances_speaker=None,
+                 speakers_names=None, use_no_coref_list=True, consider_speakers=False ,debug=False):
         self.nlp = nlp
         self.use_no_coref_list = use_no_coref_list
         self.utterances = []
@@ -476,11 +436,12 @@ class Docs:
         self.speakers = {} # Dict speaker_id => Speaker()
         self.n_sents = 0
         self.debug = debug
+        self.consider_speakers = consider_speakers
 
-        if conll:
+        if conll is not None:
             self.genre = np.zeros((7,)) #np.array(0, ndmin=1, copy=False)
-            # genres: "bc", "bn", "mz", "nw", "pt", "tc", "wb". We take broadcast conversations to use speaker infos
-            self.genre[0] = 1
+            genres = {"bc": 0, "bn": 1, "mz": 2, "nw": 3, "pt": 4, "tc": 5, "wb": 6}#. We take broadcast conversations to use speaker infos
+            self.genre[genres[conll]] = 1
         else:
             self.genre = np.array(0, ndmin=1, copy=False)
         
@@ -514,6 +475,10 @@ class Docs:
         for mention in self.mentions:
             yield mention
 
+    ###################################
+    ###### DATA LOADING FUNCTIONS #####
+    ###################################
+    
     def set_mentions_features(self):
         ''' Features for a single mention (type, size, location, nested)'''
         #TODO : should probably update doc embedding first if it is used
@@ -604,9 +569,47 @@ class Docs:
         if utterances:
             self.add_utterances(utterances, utterances_speaker, speakers_names)
 
+    ###################################
+    ###### FEATURES AND ITERATING #####
+    ###################################
+
+    def get_anaphoricity_features(self, mention):
+        ''' Features for anaphoricity test (signle mention features + genre if conll)'''
+        features_ = mention.features_
+        features_["04_doc_genre"] = self.genre
+        return (features_, np.concatenate([mention.features, self.genre], axis=0))
+
+    def get_pair_features(self, m1, m2):
+        ''' Features for pair of mentions (same speakers, speaker mentioned, string match)'''
+        features_ = {"0_same_speaker": 1 if self.consider_speakers and m1.speaker == m2.speaker else 0,
+                     "1_ant_match_mention_speaker": 1 if self.consider_speakers and m2.speaker_match_mention(m1) else 0,
+                     "2_mention_match__speaker": 1 if self.consider_speakers and m1.speaker_match_mention(m2) else 0,
+                     "3_heads_agree": 1 if m1.heads_agree(m2) else 0,
+                     "4_exact_string_match": 1 if m1.exact_match(m2) else 0,
+                     "5_relaxed_string_match": 1 if m1.relaxed_match(m2) else 0,
+                     "6_sentence_distance": m2.utterances_sent - m1.utterances_sent,
+                     "7_mention_index_distance": m2.index - m1.index - 1,
+                     "8_overlapping": 1 if (m1.utterances_sent == m2.utterances_sent and m1.end > m2.start) else 0,
+                     "9_m1_features": m1.features_,
+                     "10_m2_features": m2.features_,
+                     "11_doc_genre": self.genre}
+        pairwise_features = [np.array([features_["0_same_speaker"],
+                                       features_["1_ant_match_mention_speaker"],
+                                       features_["2_mention_match__speaker"],
+                                       features_["3_heads_agree"],
+                                       features_["4_exact_string_match"],
+                                       features_["5_relaxed_string_match"]]),
+                             encode_distance(features_["6_sentence_distance"]),
+                             encode_distance(features_["7_mention_index_distance"]),
+                             np.array(features_["8_overlapping"], ndmin=1),
+                             m1.features,
+                             m2.features,
+                             self.genre]
+        return (features_, np.concatenate(pairwise_features, axis=0))
+
     def get_candidate_mentions(self, last_utterances_added=False):
         '''
-        Return iterator over mention indexes in a list of utterances if specified
+        Return iterator over indexes of mentions in a list of utterances if specified
         '''
         if last_utterances_added:
             for i, mention in enumerate(self.mentions):
@@ -618,7 +621,7 @@ class Docs:
             for i in iterator:
                 yield i
 
-    def get_candidate_pairs(self, mentions, max_distance=50, max_distance_with_match=500):
+    def get_candidate_pairs(self, mentions=None, max_distance=50, max_distance_with_match=500):
         '''
         A method for building dictionnary of candidate antecedent-anaphor pairs for a list of mentions
 
@@ -628,6 +631,9 @@ class Docs:
             max_mention_distance_string_match : max distance between a mention and
                 its antecedent when there is a proper noun match
         '''
+        if mentions is None:
+            mentions = range(len(self.mentions))
+
         word_to_mentions = {}
         for i in mentions:
             for tok in self.mentions[i].content_words:

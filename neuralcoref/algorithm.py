@@ -10,7 +10,7 @@ import os
 
 import numpy as np
 
-from neuralcoref.docs import Docs, FeaturesExtractor, MENTION_TYPE, NO_COREF_LIST
+from neuralcoref.data import Data, FeaturesExtractor, MENTION_TYPE, NO_COREF_LIST
 
 #######################
 ##### UTILITIES #######
@@ -98,8 +98,8 @@ class Algorithm:
         model_path = "./spacykit/coreference/weights/conll/" if conll else "./spacykit/coreference/weights/"
         embed_model_path = "./spacykit/coreference/weights/"
         print("loading model from", model_path)
-        self.docs = Docs(embed_model_path, conll=conll, nlp=nlp, use_no_coref_list=use_no_coref_list)
-        self.feat_extractor = FeaturesExtractor(docs=self.docs, consider_speakers=conll)
+        self.data = Data(embed_model_path, conll=conll, nlp=nlp, use_no_coref_list=use_no_coref_list)
+        self.feat_extractor = FeaturesExtractor(data=self.data, consider_speakers=conll)
         self.coref_model = Model(model_path)
 
         self.clusters = {}
@@ -109,7 +109,7 @@ class Algorithm:
 
     def _prepare_clusters(self):
         # One cluster for each mention intially
-        self.mention_to_cluster = list(range(len(self.docs.mentions)))
+        self.mention_to_cluster = list(range(len(self.data.mentions)))
         self.clusters = dict((i, [i]) for i in self.mention_to_cluster)
         self.mentions_single_scores = {}
         self.mentions_pairs_scores = {}
@@ -134,14 +134,14 @@ class Algorithm:
     def display_clusters(self):
         print(self.clusters)
         for key, mentions in self.clusters.items():
-            print("cluster", key, "(", ", ".join(str(self.docs[m]) for m in mentions), ")")
+            print("cluster", key, "(", ", ".join(str(self.data[m]) for m in mentions), ")")
 
     def _run_coref_on_mentions(self, mentions):
         if self.debug: print("☘️  run_coref_on_mentions", mentions)
         best_ant = {}
         n_ant = 0
-        for mention_idx, ant_list in self.docs.get_candidate_pairs(mentions, self.max_dist, self.max_dist_match):
-            mention = self.docs[mention_idx]
+        for mention_idx, ant_list in self.data.get_candidate_pairs(mentions, self.max_dist, self.max_dist_match):
+            mention = self.data[mention_idx]
             if self.debug:
                 print("\n🚝 ", mention, "\n features_")
                 pprint(mention.features_)
@@ -153,7 +153,10 @@ class Algorithm:
                 for r in range(0, mention.embedding.shape[0], 50):
                     print(mention.embedding[r:r+8])
 
-            ana_feats = self.feat_extractor.get_anaphoricity_features(mention)
+            feats_, ana_feats = self.feat_extractor.get_anaphoricity_features(mention)
+            if self.debug:
+                print("single features")
+                pprint(feats_)
             anaphoricity_score = self.coref_model.get_anaphoricity_score(mention.embedding, ana_feats)
             self.mentions_single_scores[mention_idx] = anaphoricity_score
 
@@ -161,7 +164,7 @@ class Algorithm:
 
             best_score = anaphoricity_score - 50 * (self.greedyness - 0.5)
             for ant_idx in ant_list:
-                antecedent = self.docs[ant_idx]
+                antecedent = self.data[ant_idx]
                 if self.debug: print("🌺", mention, "-", antecedent)
                 feats_, pwf = self.feat_extractor.get_pair_features(antecedent, mention)
                 if self.debug:
@@ -185,13 +188,13 @@ class Algorithm:
         ''' Compute coreference
 
         Arg:
-            last_utterances_added: resolve coreference over the last utterances added to the docs
-            follow_chains: follow coreference chains over the previous utterances in the docs
+            last_utterances_added: resolve coreference over the last utterances added to the data
+            follow_chains: follow coreference chains over the previous utterances in the data
         '''
 
         self._prepare_clusters()
 
-        mentions = list(self.docs.get_candidate_mentions(last_utterances_added=last_utterances_added))
+        mentions = list(self.data.get_candidate_mentions(last_utterances_added=last_utterances_added))
         n_ant, antecedents = self._run_coref_on_mentions(mentions)
         mentions = antecedents.values()
         if follow_chains and n_ant > 0:
@@ -205,12 +208,12 @@ class Algorithm:
 
     def one_shot_coref(self, utterances, utterances_speakers_id=None, context=None,
                        context_speakers_id=None, speakers_names=None):
-        self.docs.set_utterances(context, context_speakers_id, speakers_names)
+        self.data.set_utterances(context, context_speakers_id, speakers_names)
         self.continuous_coref(utterances, utterances_speakers_id, speakers_names)
         return self.get_clusters()
 
     def continuous_coref(self, utterances, utterances_speakers_id=None, speakers_names=None):
-        self.docs.add_utterances(utterances, utterances_speakers_id, speakers_names)
+        self.data.add_utterances(utterances, utterances_speakers_id, speakers_names)
         self.run_coref_on_utterances(last_utterances_added=True, follow_chains=True)
         return self.get_clusters()
 
@@ -225,7 +228,7 @@ class Algorithm:
             for key, mentions in clusters.items():
                 cleaned_list = []
                 for mention_idx in mentions:
-                    mention = self.docs.mentions[mention_idx]
+                    mention = self.data.mentions[mention_idx]
                     if mention.lower_ not in NO_COREF_LIST:
                         cleaned_list.append(mention_idx)
                         self.mention_to_cluster[mention_idx] = None
@@ -233,7 +236,7 @@ class Algorithm:
             # Also clean up keys so we can build coref chains in self.get_most_representative
             added = {}
             for key, mentions in clusters.items():
-                if self.docs.mentions[key].lower_ in NO_COREF_LIST:
+                if self.data.mentions[key].lower_ in NO_COREF_LIST:
                     remove_id.append(key)
                     self.mention_to_cluster[key] = None
                     if mentions:
@@ -253,23 +256,23 @@ class Algorithm:
         clusters = self.get_clusters(remove_singletons=True, use_no_coref_list=use_no_coref_list)
         coreferences = {}
         print("clusters", clusters.items())
-        for key in self.docs.get_candidate_mentions(last_utterances_added=last_utterances_added):
+        for key in self.data.get_candidate_mentions(last_utterances_added=last_utterances_added):
             if self.mention_to_cluster[key] is None:
                 continue
             mentions = clusters.get(self.mention_to_cluster[key], None)
             if mentions is None:
                 continue
-            representative = self.docs.mentions[key]
+            representative = self.data.mentions[key]
             print("representative", representative)
             for mention_idx in mentions[1:]:
-                mention = self.docs.mentions[mention_idx]
+                mention = self.data.mentions[mention_idx]
                 print("Against mention", mention)
                 if mention.mention_type is not representative.mention_type:
                     if mention.mention_type == MENTION_TYPE["PROPER"] \
                         or (mention.mention_type == MENTION_TYPE["NOMINAL"] and
                                 representative.mention_type == MENTION_TYPE["PRONOMINAL"]):
                         print("better !")
-                        coreferences[self.docs.mentions[key]] = mention
+                        coreferences[self.data.mentions[key]] = mention
                         representative = mention
 
         return coreferences
