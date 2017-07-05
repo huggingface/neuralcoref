@@ -315,7 +315,7 @@ class EmbeddingExtractor:
                 embeddings[line.strip()] = mat[i, :]
                 voc[line.strip()] = i
         return embeddings, voc
- 
+
     @staticmethod
     def normalize_word(w):
         if w is None:

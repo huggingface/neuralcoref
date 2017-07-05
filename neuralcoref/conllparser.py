@@ -39,7 +39,8 @@ class ConllDoc(Data):
         self.n_sents += len(list(doc.sents))
 
     def w2idx(self, word):
-        return self.embed_extractor.tuned_voc[word]
+        # index of the word in the static embeddings
+        return self.embed_extractor.static_voc[word]
 
     def get_features_matrices(self, debug=False):
         if not self.mentions:
