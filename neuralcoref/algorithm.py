@@ -7,10 +7,10 @@ from __future__ import print_function
 from pprint import pprint
 
 import os
-
+import spacy
 import numpy as np
 
-from neuralcoref.data import Data, FeaturesExtractor, MENTION_TYPE, NO_COREF_LIST
+from neuralcoref.data import Data, MENTION_TYPE, NO_COREF_LIST
 
 #######################
 ##### UTILITIES #######
@@ -98,8 +98,7 @@ class Algorithm:
         model_path = "./spacykit/coreference/weights/conll/" if conll else "./spacykit/coreference/weights/"
         embed_model_path = "./spacykit/coreference/weights/"
         print("loading model from", model_path)
-        self.data = Data(embed_model_path, conll=conll, nlp=nlp, use_no_coref_list=use_no_coref_list)
-        self.feat_extractor = FeaturesExtractor(data=self.data, consider_speakers=conll)
+        self.data = Data(nlp, model_path=embed_model_path, conll=conll, use_no_coref_list=use_no_coref_list, consider_speakers=conll)
         self.coref_model = Model(model_path)
 
         self.clusters = {}
@@ -153,7 +152,7 @@ class Algorithm:
                 for r in range(0, mention.embedding.shape[0], 50):
                     print(mention.embedding[r:r+8])
 
-            feats_, ana_feats = self.feat_extractor.get_anaphoricity_features(mention)
+            feats_, ana_feats = self.data.get_anaphoricity_features(mention)
             if self.debug:
                 print("single features")
                 pprint(feats_)
@@ -166,7 +165,7 @@ class Algorithm:
             for ant_idx in ant_list:
                 antecedent = self.data[ant_idx]
                 if self.debug: print("🌺", mention, "-", antecedent)
-                feats_, pwf = self.feat_extractor.get_pair_features(antecedent, mention)
+                feats_, pwf = self.data.get_pair_features(antecedent, mention)
                 if self.debug:
                     print("pair features")
                     pprint(feats_)

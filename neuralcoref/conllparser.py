@@ -41,7 +41,7 @@ class ConllDoc(Data):
     def w2idx(self, word):
         return self.embed_extractor.tuned_voc[word]
 
-    def save_feature_matrix(self, save_path, debug=False):
+    def get_features_matrices(self, debug=False):
         if not self.mentions:
             raise ValueError("No mention in this doc !")
 
@@ -50,62 +50,62 @@ class ConllDoc(Data):
         mention_span = []
         mention_words = []
         mention_features = []
-        for mention in self.mentions:
-            if debug: print(mention)
-            if debug: print("mention.spans_embeddings", mention.spans_embeddings.shape)
-            mention_span.append(mention.spans_embeddings)
-            if debug: print("mention_words", np.array([self.w2idx(w) for _, w in sorted(mention.words_embeddings_.items())]).shape)
-            mention_words.append(np.array([self.w2idx(w) for _, w in sorted(mention.words_embeddings_.items())]))
-            if debug: print("mention_features", self.get_anaphoricity_features(mention)[1].shape)
-            mention_features.append(self.get_anaphoricity_features(mention)[1])
-
         pair_span = []
         pair_words = []
         pair_features = []
-        pair_label = []
-        single_label = []
+        pair_labels = []
+        single_labels = []
         mention_pair_indices = []
         total_pairs = 0
         for mention_idx, antecedents_idx in self.get_candidate_pairs():
             mention = self.mentions[mention_idx]
             ants = [self.mentions[ant_idx] for ant_idx in antecedents_idx]
-            if debug: print(mention, ants)
+            mention_span.append(mention.spans_embeddings)
+            mention_words.append(np.array([self.w2idx(w) for _, w in sorted(mention.words_embeddings_.items())]))
+            mention_features.append(self.get_anaphoricity_features(mention)[1])
             pair_span.append(np.vstack([ant.spans_embeddings for ant in ants]))
-            if debug: print("pair_span", np.vstack([ant.spans_embeddings for ant in ants]).shape)
             pair_words.append(np.array([[self.w2idx(w) for _, w in sorted(ant.words_embeddings_.items())] \
                                         for ant in ants]))
-            if debug: print("pair_words", np.array([[self.w2idx(w) for _, w in sorted(ant.words_embeddings_.items())] \
-                                        for ant in ants]).shape)
             pair_features.append(np.array([self.get_pair_features(ant, mention)[1] for ant in ants]))
-            if debug: print("pair_features", np.array([self.get_pair_features(ant, mention)[1] for ant in ants]).shape)
-            pair_label += [1 if ant.gold_label == mention.gold_label else 0 for ant in ants]
-            if debug: print("pair_label", np.array([1 if ant.gold_label == mention.gold_label else 0 for ant in ants]))
-            single_label.append(0 if any(ant.gold_label == mention.gold_label for ant in ants) else 1)
-            if debug: print("single_label", single_label[-1])
+            ant_labels = [[1 if ant.gold_label == mention.gold_label else 0] for ant in ants]
+            no_antecedent = not any(ant.gold_label == mention.gold_label for ant in ants)
+            pair_labels += ant_labels
+            single_labels.append([1 if no_antecedent else 0])
             mention_pair_indices.append([total_pairs, total_pairs + len(ants)])
             total_pairs += len(ants)
 
-        prefix = save_path + self.name.replace(u'/', '_') + str(self.part)
+            if debug:
+                print(mention, ants)
+                print("mention.spans_embeddings", mention.spans_embeddings.shape)
+                print("mention_words", np.array([self.w2idx(w) for _, w in sorted(mention.words_embeddings_.items())]).shape)
+                print("mention_features", self.get_anaphoricity_features(mention)[1].shape)
+                print("pair_span", np.vstack([ant.spans_embeddings for ant in ants]).shape)
+                print("pair_words", np.array([[self.w2idx(w) for _, w in sorted(ant.words_embeddings_.items())] \
+                                        for ant in ants]).shape)
+                print("pair_features", np.array([self.get_pair_features(ant, mention)[1] for ant in ants]).shape)
+                print("pair_labels", np.array([1 if ant.gold_label == mention.gold_label else 0 for ant in ants]))
+                print("single_labels", 0 if any(ant.gold_label == mention.gold_label for ant in ants) else 1)
+
         if debug:
-            print("saving", prefix)
-            print("_mention_span", np.vstack(mention_span).shape)
-            print("_mention_words", np.vstack(mention_words).shape)
-            print("_mention_features", np.vstack(mention_features).shape)
-            print("_pair_span", np.vstack(pair_span).shape)
-            print("_pair_words", np.vstack(pair_words).shape)
-            print("_pair_features", np.vstack(pair_features).shape)
-            print("_pair_label", np.array(pair_label).shape)
-            print("_single_label", np.array(single_label).shape)
-            print("_mention_pair_indices", np.array(mention_pair_indices).shape)
-        np.save(prefix + "_mention_span", np.vstack(mention_span))
-        np.save(prefix + "_mention_words", np.vstack(mention_words))
-        np.save(prefix + "_mention_features", np.vstack(mention_features))
-        np.save(prefix + "_pair_span", np.vstack(pair_span))
-        np.save(prefix + "_pair_words", np.vstack(pair_words))
-        np.save(prefix + "_pair_features", np.vstack(pair_features))
-        np.save(prefix + "_pair_label", np.array(pair_label))
-        np.save(prefix + "_single_label", np.array(single_label))
-        np.save(prefix + "_mention_pair_indices", np.array(mention_pair_indices))
+            print("mention_span", np.vstack(mention_span).shape)
+            print("mention_words", np.vstack(mention_words).shape)
+            print("mention_features", np.vstack(mention_features).shape)
+            print("pair_span", np.vstack(pair_span).shape)
+            print("pair_words", np.vstack(pair_words).shape)
+            print("pair_features", np.vstack(pair_features).shape)
+            print("pair_labels", np.array(pair_labels).shape)
+            print("single_labels", np.array(single_labels).shape)
+            print("mention_pair_indices", np.array(mention_pair_indices).shape)
+        return {"mention_span": np.vstack(mention_span),
+                "mention_words": np.vstack(mention_words),
+                "mention_features": np.vstack(mention_features),
+                "pair_span": np.vstack(pair_span),
+                "pair_words": np.vstack(pair_words),
+                "pair_features": np.vstack(pair_features),
+                "pair_labels": np.array(pair_labels),
+                "single_labels": np.array(single_labels),
+                "mention_pair_indices": np.array(mention_pair_indices),
+                "vocab_size": np.array(len(self.embed_extractor.static_voc))}
 
 class ConllDataset:
     def __init__(self, data_path, save_path, embed_path="./weights/", nlp=None):
@@ -118,11 +118,34 @@ class ConllDataset:
                 print("No spacy 2 model detected, using spacy1 'en' model")
                 model = 'en'
             nlp = spacy.load(model)
-
         self.nlp = nlp
         self.embed_path = embed_path
         self.save_path = save_path
+        self.features = None
         self.load_dataset(data_path)
+
+    def update_arrays(self, doc, debug=True):
+        update_dict = doc.get_features_matrices(debug=debug)
+        if debug: print("🎃 updating array")
+        if self.features is not None:
+            for k, v in update_dict.items():
+                self.features[k] = np.vstack([self.features[k], v])
+                if debug: print(k, self.features[k].shape)
+        else:
+            self.features = update_dict
+
+    def save_arrays(self, save_name):
+        for k, v in self.features.items():
+            np.save(save_name + k, v)
+
+    def load_dataset(self, path):
+        for dirpath, _, filenames in os.walk(path):
+            for filename in [f for f in filenames if f.endswith(".v4_auto_conll")]:
+                full_name = os.path.join(dirpath, filename)
+                print("Importing", full_name)
+                self.features = None
+                self.load_file(full_name)
+                self.save_arrays(self.save_path + full_name.split(sep='.')[0])
 
     def load_file(self, full_name, debug=False):
         with open(full_name, 'r') as f:
@@ -157,7 +180,7 @@ class ConllDataset:
                               "utterances", len(doc.utterances), #"\n", doc.utterances,
                               "mentions", len(doc.mentions), #"\n", doc.mentions,
                               "speakers", len(doc.speakers))#, "\n", doc.speakers)
-                        doc.save_feature_matrix(self.save_path, debug=True)
+                        self.update_arrays(doc)
                         doc = None
                     else:
                         raise ValueError("Error on end line " + line)
@@ -219,24 +242,17 @@ class ConllDataset:
                 else:
                     raise ValueError("Line not standard " + line)
 
-    def load_dataset(self, path):
-        for dirpath, _, filenames in os.walk(path):
-            for filename in [f for f in filenames if f.endswith(".v4_auto_conll")]:
-                full_name = os.path.join(dirpath, filename)
-                print("Importing", full_name)
-                self.load_file(full_name)
-
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        data_path = sys.argv[1]
-        save_dir = data_path + "/numpy/"
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+        DATA_PATH = sys.argv[1]
+        SAVE_DIR = DATA_PATH + "/numpy/"
+        if not os.path.exists(SAVE_DIR):
+            os.makedirs(SAVE_DIR)
         else:
-            if os.listdir(save_dir):
-                print("There are already data in", save_dir)
+            if os.listdir(SAVE_DIR):
+                print("There are already data in", SAVE_DIR)
                 print("Erasing")
-                for file in os.listdir(save_dir):
+                for file in os.listdir(SAVE_DIR):
                     print(file)
-                    os.remove(save_dir + file)
-            ConllDataset(data_path, save_dir)
+                    os.remove(SAVE_DIR + file)
+            ConllDataset(DATA_PATH, SAVE_DIR)
