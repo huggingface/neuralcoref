@@ -10,13 +10,13 @@ import sys
 from wsgiref.simple_server import make_server
 import falcon
 
-from algorithm import Algorithm
+from algorithm import Coref
 from data import MENTION_LABEL
 
 is_python2 = int(sys.version[0]) == 2
 unicode_ = unicode if is_python2 else str
 
-class CorefWrapper(Algorithm):
+class CorefWrapper(Coref):
     def parse_and_get_mentions(self, utterances, utterances_speakers_id=None, context=None,
                                context_speakers_id=None, speakers_names=None):
         self.data.set_utterances(context, context_speakers_id, speakers_names)

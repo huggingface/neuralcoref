@@ -61,7 +61,7 @@ class Model:
         return self._score(first_layer_input, self.pair_mentions_model)
 
 
-class Algorithm:
+class Coref:
     '''
     Main coreference resolution algorithm
     '''
