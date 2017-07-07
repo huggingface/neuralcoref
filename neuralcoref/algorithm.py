@@ -27,27 +27,20 @@ class Model:
     Coreference neural model
     '''
     def __init__(self, model_path):
-        self.antecedent_matrix = np.load(model_path + "antecedent_matrix.npy")
-        self.anaphor_matrix = np.load(model_path + "anaphor_matrix.npy")
-        self.pair_features_matrix = np.load(model_path + "pair_features_matrix.npy")
-        self.pairwise_first_layer_bias = np.load(model_path + "pairwise_first_layer_bias.npy")
-        self.anaphoricity_model = []
-        weights = []
-        biases = []
+        weights, biases = [], []
         for file in sorted(os.listdir(model_path)):
-            if file.startswith("anaphoricity_model_weights"):
+            if file.startswith("single_mention_weights"):
                 weights.append(np.load(os.path.join(model_path, file)))
-            if file.startswith("anaphoricity_model_bias"):
+            if file.startswith("single_mention_bias"):
                 biases.append(np.load(os.path.join(model_path, file)))
-        self.anaphoricity_model = list(zip(weights, biases))
-        weights = []
-        biases = []
+        self.single_mention_model = list(zip(weights, biases))
+        weights, biases = [], []
         for file in sorted(os.listdir(model_path)):
-            if file.startswith("pairwise_model_weights"):
+            if file.startswith("pair_mentions_weights"):
                 weights.append(np.load(os.path.join(model_path, file)))
-            if file.startswith("pairwise_model_bias"):
+            if file.startswith("pair_mentions_bias"):
                 biases.append(np.load(os.path.join(model_path, file)))
-        self.pairwise_model = list(zip(weights, biases))
+        self.pair_mentions_model = list(zip(weights, biases))
 
     def _score(self, features, layers):
         for weights, bias in layers:
@@ -56,18 +49,16 @@ class Model:
                 features = np.maximum(features, 0) # ReLU
         return np.sum(features)
 
-    def get_anaphoricity_score(self, mention_embedding, anaphoricity_features):
-        ''' Anaphoricity score for an anaphor '''
-        first_layer_output = np.concatenate([mention_embedding, anaphoricity_features], axis=0)[:, np.newaxis]
-        return self._score(first_layer_output, self.anaphoricity_model)
+    def get_single_mention_score(self, mention_embedding, anaphoricity_features):
+        first_layer_input = np.concatenate([mention_embedding,
+                                            anaphoricity_features], axis=0)[:, np.newaxis]
+        return self._score(first_layer_input, self.single_mention_model)
 
-    def get_pairwise_score(self, antecedent, mention, pair_features):
-        antecedent_embedding = np.matmul(self.antecedent_matrix, antecedent.embedding)
-        anaphor_embedding = np.matmul(self.anaphor_matrix, mention.embedding)
-        first_layer_output = antecedent_embedding + anaphor_embedding \
-                             + np.matmul(self.pair_features_matrix, pair_features) + self.pairwise_first_layer_bias
-        first_layer_output = np.maximum(first_layer_output, 0)[:, np.newaxis] # ReLU
-        return self._score(first_layer_output, self.pairwise_model)
+    def get_pair_mentions_score(self, antecedent, mention, pair_features):
+        first_layer_input = np.concatenate([antecedent.embedding,
+                                            mention.embedding,
+                                            pair_features], axis=0)[:, np.newaxis]
+        return self._score(first_layer_input, self.pair_mentions_model)
 
 
 class Algorithm:
@@ -159,7 +150,7 @@ class Algorithm:
         for mention_idx, ant_list in self.data.get_candidate_pairs(mentions, self.max_dist, self.max_dist_match):
             mention = self.data[mention_idx]
             feats_, ana_feats = self.data.get_anaphoricity_features(mention)
-            anaphoricity_score = self.coref_model.get_anaphoricity_score(mention.embedding, ana_feats)
+            anaphoricity_score = self.coref_model.get_single_mention_score(mention.embedding, ana_feats)
             self.mentions_single_scores[mention_idx] = anaphoricity_score
             self.mentions_single_features[mention_idx] = {"spansEmbeddings": mention.spans_embeddings_, "wordsEmbeddings": mention.words_embeddings_, "features": feats_}
 
@@ -167,7 +158,7 @@ class Algorithm:
             for ant_idx in ant_list:
                 antecedent = self.data[ant_idx]
                 feats_, pwf = self.data.get_pair_features(antecedent, mention)
-                score = self.coref_model.get_pairwise_score(antecedent, mention, pwf)
+                score = self.coref_model.get_pair_mentions_score(antecedent, mention, pwf)
                 self.mentions_pairs_scores[mention_idx][ant_idx] = score
                 self.mentions_pairs_features[mention_idx][ant_idx] = {"pairFeatures": feats_, "antecedentSpansEmbeddings": antecedent.spans_embeddings_,
                                                                       "antecedentWordsEmbeddings": antecedent.words_embeddings_,

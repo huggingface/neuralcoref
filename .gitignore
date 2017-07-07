@@ -15,6 +15,5 @@ __pycache__/
 /lib/
 /pip-selfcheck.json
 neuralcoref/data/*
-neuralcoref/weights/*
 neuralcoref/train/*
 .cache
