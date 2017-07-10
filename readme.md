@@ -1,6 +1,6 @@
 # Neural coref
 
-State-of-the-art coreference resolution librairy using neural nets and spaCy. [Try it online !](https://huggingface.co/coref/)
+State-of-the-art coreference resolution library using neural nets and spaCy. [Try it online !](https://huggingface.co/coref/)
 ![Neuralcoref demo](https://huggingface.co/coref/assets/thumbnail-large.png)
 
 This coreference resolution module is based on the super fast [spaCy](https://spacy.io/) parser and uses the scoring neural model described in [Deep Reinforcement Learning for Mention-Ranking Coreference Models](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf) by Kevin Clark and Christopher D. Manning, EMNLP 2016.
