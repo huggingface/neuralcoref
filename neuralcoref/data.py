@@ -19,7 +19,7 @@ import numpy as np
 ####### UTILITIES #######
 #########################
 
-NO_COREF_LIST = ["i", "you"]
+NO_COREF_LIST = ["i", "me", "my", "you", "your"]
 
 MENTION_TYPE = {"PRONOMINAL": 0, "NOMINAL": 1, "PROPER": 2, "LIST": 3}
 MENTION_LABEL = {0: "PRONOMINAL", 1: "NOMINAL", 2: "PROPER", 3: "LIST"}
@@ -138,8 +138,8 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
             if debug: print("Conjunction found, storing first element separately")
             for c in doc:
                 if c.head == token and c.dep_ != "conj":
-                    print("left no conj", c, c.dep_, c.left_edge)
-                    print("right no conj", c, c.dep_, c.right_edge)
+                    if debug: print("left no conj", c, c.dep_, c.left_edge)
+                    if debug: print("right no conj", c, c.dep_, c.right_edge)
             left_no_conj = list(c.left_edge.i for c in doc if c.head == token and c.dep_ != "conj")
             right_no_conj = list(c.right_edge.i for c in doc if c.head == token and c.dep_ != "conj")
             if debug: print("left side no conj", [doc[i] for i in left_no_conj])
