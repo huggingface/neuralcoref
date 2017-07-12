@@ -195,17 +195,17 @@ class Coref:
 
     def one_shot_coref(self, utterances, utterances_speakers_id=None, context=None,
                        context_speakers_id=None, speakers_names=None):
-        ''' Clear history, load a list of utterances and run the coreference model on them
+        ''' Clear history, load a list of utterances and an optional context and run the coreference model on them
 
         Arg:
-            utterances : iterator or list of string corresponding to successive utterances
-            utterances_speaker : iterator or list of speaker id for each utterance.
-                If not provided, assume two speakers speaking alternatively.
-                if utterances and utterances_speaker are not of the same length padded with None
-            context : same as utterances but coreferences are not computed for this,
-                      only used as possible antecedent to utterances mentions
-            context_speaker : same as utterances_speaker
-            speakers_names : dictionnary of list of acceptable speaker names for each speaker id
+        - `utterances` : iterator or list of string corresponding to successive utterances (in a dialogue) or sentences.
+            Can be a single string for non-dialogue text.
+        - `utterances_speakers_id=None` : iterator or list of speaker id for each utterance (in the case of a dialogue).
+            - if not provided, assume two speakers speaking alternatively.
+            - if utterances and utterances_speaker are not of the same length padded with None
+        - `context=None` : iterator or list of string corresponding to additionnal utterances/sentences sent prior to `utterances`. Coreferences are not computed for the mentions identified in `context`. The mentions in `context` are only used as possible antecedents to mentions in `uterrance`. Reduce the computations when we are only interested in resolving coreference in the last sentences/utterances.
+        - `context_speakers_id=None` : same as `utterances_speakers_id` for `context`. 
+        - `speakers_names=None` : dictionnary of list of acceptable speaker names (strings) for speaker_id in `utterances_speakers_id` and `context_speakers_id`
         Return:
             clusters of entities with coreference resolved
         '''
@@ -215,9 +215,16 @@ class Coref:
 
     def continuous_coref(self, utterances, utterances_speakers_id=None, speakers_names=None):
         '''
-        Same as one-shot coref but don't clear the history.
         Only resolve coreferences for the mentions in the utterances
         (but use the mentions in previously loaded utterances as possible antecedents)
+        Arg:
+            utterances : iterator or list of string corresponding to successive utterances
+            utterances_speaker : iterator or list of speaker id for each utterance.
+                If not provided, assume two speakers speaking alternatively.
+                if utterances and utterances_speaker are not of the same length padded with None
+            speakers_names : dictionnary of list of acceptable speaker names for each speaker id
+        Return:
+            clusters of entities with coreference resolved
         '''
         self.data.add_utterances(utterances, utterances_speakers_id, speakers_names)
         self.run_coref_on_utterances(last_utterances_added=True, follow_chains=True)
@@ -227,8 +234,41 @@ class Coref:
     ###### INFORMATION RETRIEVAL ######
     ###################################
 
+    def get_utterances(self, last_utterances_added=True):
+        ''' Retrieve the list of parsed uterrances'''
+        if last_utterances_added:
+            return [self.data.utterances[idx] for idx in self.data.last_utterances_loaded]
+        else:
+            return self.data.utterances
+
+    def get_resolved_utterances(self, last_utterances_added=True, use_no_coref_list=True):
+        ''' Return a list of utterrances text where the '''
+        coreferences = self.get_most_representative(last_utterances_added, use_no_coref_list)
+        resolved_utterances = []
+        for utt in self.get_utterances(last_utterances_added=last_utterances_added):
+            resolved_utt = ""
+            in_coref = None
+            for token in utt:
+                if in_coref is None:
+                    for coref_original, coref_replace in coreferences.items():
+                        if coref_original[0] == token:
+                            in_coref = coref_original
+                            resolved_utt += coref_replace.text.lower()
+                            break
+                    if in_coref is None:
+                        resolved_utt += token.text_with_ws
+                if in_coref is not None and token == in_coref[-1]:
+                    resolved_utt += ' ' if token.whitespace_ and resolved_utt[-1] is not ' ' else ''
+                    in_coref = None
+            resolved_utterances.append(resolved_utt)
+        return resolved_utterances
+
+    def get_mentions(self):
+        ''' Retrieve the list of mentions'''
+        return self.data.mentions
+
     def get_scores(self):
-        ''' Retrieve single and pair scores'''
+        ''' Retrieve scores for single mentions and pair of mentions'''
         return {"single_scores": self.mentions_single_scores,
                 "pair_scores": self.mentions_pairs_scores}
 
@@ -241,9 +281,8 @@ class Coref:
                 cleaned_list = []
                 for mention_idx in mentions:
                     mention = self.data.mentions[mention_idx]
-                    if mention.lower_ in NO_COREF_LIST:
+                    if mention.lower_ not in NO_COREF_LIST:
                         cleaned_list.append(mention_idx)
-                        self.mention_to_cluster[mention_idx] = None
                 clusters[key] = cleaned_list
             # Also clean up keys so we can build coref chains in self.get_most_representative
             added = {}
@@ -253,14 +292,18 @@ class Coref:
                     self.mention_to_cluster[key] = None
                     if mentions:
                         added[mentions[0]] = mentions
+            for rem in remove_id:
+                del clusters[rem]
             clusters.update(added)
+
         if remove_singletons:
+            remove_id = []
             for key, mentions in clusters.items():
                 if len(mentions) == 1:
                     remove_id.append(key)
                     self.mention_to_cluster[key] = None
-        for rem in remove_id:
-            del clusters[rem]
+            for rem in remove_id:
+                del clusters[rem]
 
         return clusters
 
