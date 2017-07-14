@@ -85,7 +85,8 @@ The code of `server.py` also provides a simple example.
 
 #### Example:
 Here is a simple example of use of the coreference resolution system.
-````
+
+````python
 from neuralcoref import Coref
 
 coref = Coref()
