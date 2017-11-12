@@ -18,6 +18,8 @@ setup(name='neuralcoref',
         'Programming Language :: Python :: 3.5'
       ],
       packages=find_packages(),
+      package_data={'neuralcoref': ['neuralcoref/weights/*.npy']},
+      include_package_data=True,
       keywords='NLP chatbots coreference resolution',
       license='MIT',
       zip_safe=False,
