@@ -3,8 +3,8 @@ from setuptools import setup, find_packages
 setup(name='neuralcoref',
       version='0.1',
       description="State-of-the-art coreference resolution using neural nets",
-      url='https://github.com/huggingface/neuralcoref',
-      download_url='https://github.com/huggingface/neuralcoref/archive/0.1.tar.gz',
+      url='https://github.com/Elizabeth2507/neuralcoref',
+      download_url='https://github.com/Elizabeth2507/neuralcoref/archive/0.1.tar.gz',
       author='Thomas Wolf',
       author_email='thomwolf@gmail.com',
       classifiers=[
