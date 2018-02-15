@@ -16,7 +16,7 @@ python-mimeparse==1.6.0
 regex==2017.4.5
 requests==2.18.1
 six==1.10.0
-spacy==1.8.2
+spacy==2.0.7
 termcolor==1.1.0
 thinc==6.5.2
 toolz==0.8.2
