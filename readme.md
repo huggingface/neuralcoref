@@ -11,16 +11,16 @@ Be sure to check out [our medium post](https://medium.com/huggingface/state-of-t
 Clone the repo and install using pip (the trained model weights are too large for PyPI)
 
 ```
-git clone git@github.com:huggingface/neuralcoref.git
+git clone https://github.com/huggingface/neuralcoref.git
 cd neuralcoref
 pip install .
 ```
 
 
 You will also need an English model for spaCy if you don't already have spaCy installed in your environment.
-````
-python -m spacy download 'en'
-````
+```
+python -m spacy download en
+```
 
 The mention extraction module is strongly influenced by the quality of the parsing so we recommend selecting a model with a higher accuray than usual.
 
