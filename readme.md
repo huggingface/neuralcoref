@@ -8,28 +8,21 @@ This coreference resolution module is based on the super fast [spaCy](https://sp
 Be sure to check out [our medium post](https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30) in which we talk more about neuralcoref and coreference resolution.
 
 ## Installation
-Clone the repo (the trained model weights are too large for PyPI)
+Clone the repo and install using pip (the trained model weights are too large for PyPI)
 
 ```
+git clone git@github.com:huggingface/neuralcoref.git
 cd neuralcoref
-pip install -r requirements.txt
+pip install .
 ```
 
 
-You will also need an English model for spaCy if you don't already have spaCy installed.
+You will also need an English model for spaCy if you don't already have spaCy installed in your environment.
 ````
 python -m spacy download 'en'
 ````
 
-The mention extraction module is strongly influenced by the quality of the parsing so we recommend selecting a model with a higher accuray than usual. Since the coreference algorithm don't make use of spaCy's word vectors, a medium sized spaCy model like  ['en_depent_web_md'](https://github.com/explosion/spacy-models/releases/en_depent_web_md-1.2.1) can strike a good balance between memory footprint and parsing accuracy.
-
-To download and install the  ['en_depent_web_md'](https://github.com/explosion/spacy-models/releases/en_depent_web_md-1.2.1) model:
-````
-python -m spacy download 'en_depent_web_md'
-python -m spacy link en_depent_web_md en
-````
-
-If you are an early user of [spacy 2 alpha](https://github.com/explosion/spaCy/releases/tag/v2.0.0-alpha), you can use `neuralcoref` with spacy 2 without any specific modification.
+The mention extraction module is strongly influenced by the quality of the parsing so we recommend selecting a model with a higher accuray than usual.
 
 ## Usage
 ### As a standalone server

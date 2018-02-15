@@ -527,16 +527,7 @@ class Data:
             utterances_speaker = ((i + a + 1) % 2 for i in range(len(utterances)))
         utterances_index = []
         utt_start = len(self.utterances)
-        for utt_index, (utterance, speaker_id) in enumerate(zip_longest(utterances, utterances_speaker)):
-            if utterance is None:
-                break
-            # Pipe currently broken in spacy 2 alpha
-            # Also, spacy 2 currently throws an exception on empty strings
-            try:
-                doc = self.nlp(utterance)
-            except IndexError:
-                doc = self.nlp(u" ")
-                if self.debug: print("Empty string")
+        for utt_index, (doc, speaker_id) in enumerate(zip_longest(self.nlp.pipe(utterances), utterances_speaker)):
             if speaker_id not in self.speakers:
                 speaker_name = speakers_names.get(speaker_id, None) if speakers_names else None
                 self.speakers[speaker_id] = Speaker(speaker_id, speaker_name)
