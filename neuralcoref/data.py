@@ -335,7 +335,7 @@ class EmbeddingExtractor:
         voc = {}
         mat = np.load(name+"_embeddings.npy")
         average_mean = np.average(mat, axis=0, weights=np.sum(mat, axis=1))
-        with open(name+"_vocabulary.txt") as f:
+        with open(name+"_vocabulary.txt", encoding="utf8") as f:
             for i, line in enumerate(f):
                 embeddings[line.strip()] = mat[i, :]
                 voc[line.strip()] = i
