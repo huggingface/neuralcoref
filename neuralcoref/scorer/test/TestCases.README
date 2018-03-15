@@ -1,0 +1,390 @@
+TC-A-1 - perfect:
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {bc} {def}
+Expected: BCUB=1 [recall=6/6, prec=6/6]
+Expected: MUC=1 [recall=3/3=1, prec=3/3=1]
+Expected: CEAFm=1 [recall=6/6=1, prec=6/6=1]
+Expected: CEAFe=1 [recall=3/3=1, prec=3/3=1]
+Expected: BLANC=1 [recall_c=4/4=1, prec_c=4/4=1, recall_n=11/11=1, prec_n=11/11=1]
+
+TC-A-2 -- response with missing mentions/entities
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {de}
+Expected: BCUB=.5599 [recall=7/18, prec=3/3]
+Expected: MUC=0.5 [recall=1/3, prec=1/1]
+Expected: CEAFm=6/9=0.67 [common=3, recall=3/6=0.5, Prec=3/3=1]
+Expected: CEAFe=3.6/5=0.72 [common=1+4/5=1.8, recall=1.8/3=0.6, Prec=1.8/2=0.9]
+Expected: BLANC=0.35 [recall_c=1/4, prec_c=1/1, recall_n=2/11, prec_n=2/2]
+
+TC-A-3 -- response with false-alarm mentions/entities
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {bcx} {defy} {z}
+Expected: BCUB=.6748 [recall=6/6, prec=55/108]
+Expected: MUC=0.75 [recall=3/3, prec=3/5]
+Expected: CEAFm=12/15=0.8 [common=6, recall=6/6=1, prec=6/9=.67]
+Expected: CEAFe=3.6/5=0.76 [common=1+4/5+6/7=2.66, recall=2.66/3=0.89, Prec=2.66/4=0.66]
+Expected: BLANC=0.60 [recall_c=4/4, prec_c=4/9, recall_n=11/11, prec_n=11/27]
+
+
+TC-A-4 -- response with both missing and false-alarm mentions/entities
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {bcx} {dy} {z}
+Expected: BCUB=.4683 [recall=5/9, prec=17/42]
+Expected: MUC=1/3=.33333 [recall=1/3, prec=1/3]
+Expected: CEAFm=8/13=0.62 [common=4 recall=4/6=0.67 prec=4/7=.57]
+Expected: CEAFe=4.4/7=0.63 [common=1+4/5+2/5=2.2, recall=2.2/3=0.73, Prec=2.2/4=0.55]
+Expected: BLANC=0.30 [recall_c=1/4, prec_c=1/4, recall_n=5/11, prec_n=5/17]
+
+TC-A-5 -- response with both missing and false-alarm mentions/entities, and overlapping mentions (capitalized letter: b and B). Overlapping mention B in the aligned entity.
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {bcxB} {dy} {z}
+Expected: BCUB=.4 [recall=5/9, prec=5/16]
+Expected: MUC=2/7=.28571 [recall=1/3, prec=1/4]
+Expected: CEAFm=8/14=0.57 [common=4 recall=4/6=0.67 prec=4/8=.5]
+Expected: CEAFe=4.14/7=0.59 [common=1+4/6+2/5=2.07, recall=2.07/3=0.69, Prec=2.07/4=0.52]
+Expected: BLANC=0.25 [recall_c=1/4, prec_c=1/7, recall_n=5/11, prec_n=5/21]
+
+TC-A-6 -- response with both missing and false-alarm mentions/entities, and overlapping mentions (capitalized letter: b and B). Overlapping mention B in an unaligned entity.
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {bcx} {dy} {Bz}
+Expected: BCUB=.4325 [recall=5/9, prec=17/48]
+Expected: MUC=2/7=.28571 [recall=1/3, prec=1/4]
+Expected: CEAFm=8/14=0.57 [common=4 recall=4/6=0.67 prec=4/8=.5]
+Expected: CEAFe=4.4/7=0.63 [common=1+4/5+2/5=2.2, recall=2.2/3=0.73, Prec=2.2/4=0.55]
+Expected: BLANC=0.26 [recall_c=1/4, prec_c=1/5, recall_n=5/11, prec_n=5/23]
+
+TC-A-7 -- response with both missing and false-alarm mentions/entities, and duplicate mentions (capitalized letter: b and B). Duplicate mention B in the same cluster entity (note: this is diff from TC5) -- this tests mention de-duplication.
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {bcxB} {dy} {z}
+ de-dup: {a} {bcx} {dy} {z}
+
+de-dup:
+Expected: BCUB=.4683 [recall=5/9, prec=17/42]
+Expected: MUC=1/3=.33333 [recall=1/3, prec=1/3]
+Expected: CEAFm=8/13=0.61538 [common=4, recall=4/6=0.66667, Prec=4/7=0.57143]
+Expected: CEAFe=4.14/7=0.62857 [common=1+4/5+2/5=2.2, recall=2.2/3=0.73333, Prec=2.2/4=0.55]
+Expected: BLANC=0.30 [recall_c=1/4, prec_c=1/4, recall_n=5/11, prec_n=5/17]
+
+if No de-dup: 
+Expected: CEAFm=8/14=0.57 [common=4 recall=4/6=0.67 prec=4/8=.5]
+Expected: CEAFe=4.14/7=0.59 [common=1+4/6+2/5=2.07, recall=2.07/3=0.69, Prec=2.07/4=0.52]
+
+
+TC-A-8 -- response with both missing and false-alarm mentions/entities, and duplicate mentions (capitalized letter: b and B). Duplicate mention B in a diff entity from b.
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {bcx} {dy} {Bz}
+
+De-dup: 
+Expected: BCUB=.4683 [recall=5/9, prec=17/42]
+Expected: MUC=1/3=.33333 [recall=1/3, prec=1/3]
+Expected: CEAFm=8/13=0.61538 [common=4 recall=4/6=0.67 prec=4/7=.57143]
+Expected: CEAFe=4.14/7=0.63 [common=1+4/5+2/5=2.2, recall=2.2/3=0.73, Prec=2.2/4=0.55]
+Expected: BLANC=0.30 [recall_c=1/4, prec_c=1/4, recall_n=5/11, prec_n=5/17]
+
+If no de-dup: 
+Expected: CEAFm=8/14=0.57 [common=4 recall=4/6=0.67 prec=4/8=.5]
+Expected: CEAFe=4.14/7=0.63 [common=1+4/5+2/5=2.2, recall=2.2/3=0.73, Prec=2.2/4=0.55]
+
+TC-A-9 -- show B3 can be canned: "b" is repeated 10 times so precision approaches 1
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {bcx} {dy} {Bx10z}
+de-dup Rsp/Sys: {a} {bcx} {dy} {z}
+
+De-dup: 
+Expected: BCUB=.4683 [recall=5/9, prec=17/42]
+Expected: MUC=1/3=.33333 [recall=1/3, prec=1/3]
+Expected: CEAFm=8/14=0.57 [common=4 recall=4/6=0.67 prec=4/7=.57143]
+Expected: CEAFe=4.4/7=0.63 [common=1+4/5+2/5=2.2, recall=2.2/3=0.73, Prec=2.2/4=0.55]
+Expected: BLANC=0.30 [recall_c=1/4, prec_c=1/4, recall_n=5/11, prec_n=5/17]
+
+
+TC-A-10 - Gold mentions. Only singletons in the response.
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {b} {c} {d} {e} {f}
+Expected: BCUB=.6667 [recall=3/6, prec=6/6]
+Expected: MUC=0 [recall=0, prec=0]
+Expected: BLANC=0.42 [recall_c=0/4, prec_c=0/0, f_c=0, recall_n=11/11, prec_n=11/15]
+
+
+TC-A-11 - Gold mentions. All mentions are coreferent in the response.
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {abcdef}
+
+Expected: BCUB=0.5599 [recall=6/6, prec=7/18]
+Expected: MUC=6/8=0.75 [recall=3/3, prec=3/5]
+Expected: BLANC=0.21 [recall_c=4/4, prec_c=4/15, recall_n=0/11, prec_n=0/0, f_n=0]
+
+
+TC-A-12 - System mentions. Only singletons in the response.
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {a} {x} {y} {c} {d} {e} {z}
+
+Expected: BCUB=0.4425 [recall=13/36, prec=4/7]
+Expected: MUC=0 [recall=0, prec=0]
+Expected: BLANC=0.16 [recall_c=0/4, prec_c=0/0, f_c=0, recall_n=5/11, prec_n=5/21]
+
+
+TC-A-13 - System mentions. All mentions are coreferent in the response.
+Key/Ref: {a} {bc} {def}
+Rsp/Sys: {axycdez}
+
+Expected: BCUB=0.19447 [recall=17/36, prec=6/49]
+Expected: MUC=2/9 [recall=1/3, prec=1/6]
+Expected: BLANC=0.04 [recall_c=1/4, prec_c=1/21, recall_n=0/11, prec_n=0/0, f_n=0]
+
+
+TC-B-1 -- spurious mention (x) and missing mention (a) in response; link (bc) is a key non-coref link and is an incorrect response coref link.
+
+    Keys: {ab} {cde} 
+Response: {bcx} {de}
+
+    key coref links: C_k = {(ab), (cd), (de), (ce)}
+key non-coref links: N_k = {(ac), (ad), (ae), (bc), (bd), (be)}
+
+    response coref links: C_r = {(bc), (bx), (cx), (de)}
+response non-coref links: N_r = {(bd), (be), (cd), (ce),  (xd), (xe)}
+
+(I'll use ^ for set intersection)
+C_k ^ C_r = {(de)} => R_c = |C_k^C_r| / |C_k| = 1/4, P_c = 1/|C_r| = 1/4, F_c = 1/4
+N_k ^ N_r = {(bd), (be)} => R_n = |N_k^N_r|/|N_k| = 2/6,  P_n = 2/|N_r| = 2/6, F_n = 1/3
+
+BLANC = 1/2 (F_c + F_n) = 7/24.
+
+
+
+
+	TC-C-1 -- same as TC14 plus a new entity and its correct prediction shown. this was for testing the more than two entity case.
+
+    Keys: {ab} {cde} {fg}
+Response: {bcx} {de} {fg}
+
+         key coref links: C_k = {(ab), (cd), (de), (ce), (fg)}} 
+     key non-coref links: N_k = {(ac), (ad), (ae), (bc), (bd), (be), (af), (ag), (bf), (bg), (cf), (cg), (df), (dg), (ef), (eg)}
+
+    response coref links: C_r = {(bc), (bx), (cx), (de), (fg)}
+response non-coref links: N_r = {(bd), (be), (cd), (ce), (xd), (xe), (bf), (bg), (cf), (cg), (xf), (xg), (df), (dg), (ef), (eg)}
+
+(I'll use ^ for set intersection)
+C_k ^ C_r = {(de), (fg)} => R_c = |C_k^C_r| / |C_k| = 2/5, P_c = 2/|C_r| = 2/5, F_c = 2/5 = 0.40
+N_k ^ N_r = {(bd), (be), (bf), (bg), (cf), (cg), (df), (dg), (ef), (eg)} => R_n = |N_k^N_r|/|N_k| = 10/16,  P_n = 10/|N_r| = 10/16, F_n = 10/16 = 0.625
+
+BLANC = 1/2 (F_c + F_n) = 0.5125
+
+
+
+# ------------ examples from the B-CUBED paper
+
+TC-D-1 -- merging one small cluster with a big cluster
+
+key: {12345} {67} {89ABC}
+---
+
+1-2-3-4-5
+
+6-7     
+
+8-9-A-B-C
+
+
+
+response: {12345} {6789ABC}
+---------
+
+1-2-3-4-5
+
+6-7     
+  |
+  8-9-A-B-C
+
+
+Expected: BCUB [r=12/12, p=16/21, f=0.864864865]
+Expected:  MUC [r=9/9, p=9/10, f=0.947368421]
+
+
+
+TC-E-1 -- merging two big clusters
+
+
+key: {12345} {67} {89ABC}
+---
+
+1-2-3-4-5
+
+6-7     
+
+8-9-A-B-C
+
+
+
+response: {123456789ABC} {67}
+---------
+
+1-2-3-4-5
+        |
+6-7     |
+        |
+        8-9-A-B-C
+
+
+Expected: BCUB [r=1, p=7/12, f=0.736842105]
+Expected:  MUC [r=9/9, p=9/10, f=0.947368421]
+
+
+# ---------- examples from the MUC paper
+
+TC-F-1 -- 
+
+     key: {ABCD}    ---- Links: A-B; B-C; C-D
+response: {AB} {CD} ---- Links: A-B; C-D
+
+Expected:  MUC [r=2/3, p=2/2, f=2*(2/3)*(2/2)/(2/3+2/2)]
+
+
+
+TC-G-1 --
+
+     key: {AB} {CD} ---- Links: A-B; C-D
+response: {ABCD}    ---- Links: A-B; B-C; C-D
+
+Expected:  MUC [r=2/2, p=2/3, f=2*(2/2)*(2/3)/(2/2+2/3)]
+
+
+
+TC-H-1 --
+
+     key: {ABCD} ---- Links: A-B; B-C; B-D
+response: {ABCD} ---- Links: A-B; B-C; C-D
+
+Expected:  MUC [r=1, p=1, f=1]
+
+
+
+TC-I-1 --
+
+     key: {ABCD}    ---- Links: A-B; B-C; B-D
+response: {AB} {CD} ---- Links: A-B; C-D
+
+Expected:  MUC [r=2/3, p=2/2, f=2*(2/3)*(2/2)/(2/3+2/2)]
+
+
+
+TC-J-1 --
+
+     key: {ABC} ---- Links: A-B; B-C
+response: {AC}  ---- Links: A-C
+
+Expected:  MUC [r=1/2, p=1/1, f=2*(1/2)*(1/1)/(1/2+1/1)]
+
+
+
+TC-K-1 --
+
+     key: {BCDEGHJ}         ---- Links: B-C; C-D; D-E; E-G; G-H; H-J
+response: {ABC} {DEF} {GHI} ---- Links: A-B; B-C; D-E; E-F; G-H; H-I
+
+Expected:  MUC [r=3/6, p=3/6, f=3/6]
+
+
+
+TC-L-1 --
+
+     key: {ABC} {DEFG}    ---- Links: A-B; B-C; D-E; E-F; F-G
+response: {AB} {CD} {FGH} ---- Links: A-B; C-D; F-G; G-H
+
+Expected:  MUC [r=2/5, p=2/4, f=2*(2/5)*(2/4)/(2/5+2/4)]
+
+
+TC-M-1 - Only coreferent mentions in the key. Gold mentions. Matching response. Since the key contains no non-coreference link, BLANC equals recall_c, prec_c, F_c.
+Key/Ref: {abcdef}
+Rsp/Sys: {abcdef}
+
+Expected: BCUB=1
+Expected: MUC=1
+Expected: CEAFm=1
+Expected: CEAFe=1
+Expected: BLANC=1 [recall_c=15/15=1, prec_c=15/15=1]
+
+
+TC-M-2 - Only coreferent mentions in the key. Gold mentions. Response contains only non-coreference links. 
+Key/Ref: {abcdef}
+Rsp/Sys: {a} {b} {c} {d} {e} {f}
+
+Expected: MUC=0
+Expected: BLANC=0 [recall_c=0/15=0, prec_c=0/0=0]
+
+
+TC-M-3 - Only coreferent mentions in the key. Gold mentions. Response contains coreference and non-coreference links. 
+Key/Ref: {abcdef}
+Rsp/Sys: {ab} {cde} {f}
+
+Expected: BLANC=0.42 [recall_c=4/15, prec_c=4/4=1]
+
+
+TC-M-4 - Only coreferent mentions in the key. System mentions: only coreferent mentions. Since the key contains no non-coreference link, BLANC equals recall_c, prec_c, F_c.
+Key/Ref: {abcdef}
+Rsp/Sys: {abcxyz}
+
+Expected: BLANC=0.20 [recall_c=3/15, prec_c=3/15]
+
+
+TC-M-5 - Only coreferent mentions in the key. System mentions: only singletons.
+Key/Ref: {abcdef}
+Rsp/Sys: {a} {b} {c} {x} {y} {z}
+
+Expected: MUC=0
+Expected: BLANC=0 [recall_c=0/15=0, prec_c=0/0=0]
+
+
+TC-M-6 - Only coreferent mentions in the key. System mentions: coreference and non-coreference links. 
+Key/Ref: {abcdef}
+Rsp/Sys: {ab} {cxy} {z}
+
+Expected: BLANC=0.11 [recall_c=1/15, prec_c=1/4]
+
+
+TC-N-1 - Only singletons in the key. Gold mentions. Matching response. Since the key contains no coreference link, BLANC equals recall_n, prec_n, F_n.
+Key/Ref: {a} {b} {c} {d} {e} {f}
+Rsp/Sys: {a} {b} {c} {d} {e} {f}
+
+Expected: BCUB=1
+Expected: MUC=0
+Expected: CEAFm=1
+Expected: CEAFe=1
+Expected: BLANC=1 [recall_n=15/15=1, prec_n=15/15=1]
+
+
+TC-N-2 - Only singletons in the key. Gold mentions. Response contains only coreference links. 
+Key/Ref: {a} {b} {c} {d} {e} {f}
+Rsp/Sys: {abcdef}
+
+Expected: BLANC=0 [recall_n=0/15=0, prec_n=0/0=0]
+
+
+TC-N-3 - Only singletons in the key. Gold mentions. Response contains coreference and non-coreference links. 
+Key/Ref: {a} {b} {c} {d} {e} {f}
+Rsp/Sys: {ab} {cde} {f}
+
+Expected: BLANC=0.85 [recall_n=11/15, prec_n=11/11=1]
+
+
+TC-N-4 - Only singletons in the key. System mentions: only singletons. Since the key contains no coreference link, BLANC equals recall_n, prec_n, F_n.
+Key/Ref: {a} {b} {c} {d} {e} {f}
+Rsp/Sys: {a} {b} {c} {x} {y} {z}
+
+Expected: MUC=0
+Expected: BLANC=0.20 [recall_n=3/15, prec_n=3/15]
+
+
+TC-N-5 - Only singletons in the key. System mentions: only coreference links. 
+Key/Ref: {a} {b} {c} {d} {e} {f}
+Rsp/Sys: {abcxyz}
+
+Expected: BLANC=0 [recall_n=0/15=0, prec_n=0/0=0]
+
+
+TC-N-6 - Only singletons in the key. Only coreferent mentions in the key. System mentions: coreference and non-coreference links. 
+Key/Ref: {a} {b} {c} {d} {e} {f}
+Rsp/Sys: {ab} {cxy} {z}
+
+Expected: BLANC=0.15 [recall_n=2/15, prec_n=2/11]
+
