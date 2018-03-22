@@ -5,11 +5,31 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from __future__ import print_function
 
-import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import spacy
+import numpy as np
 from tqdm import tqdm
+
+DISTANCE_BINS = list(range(5)) + [5]*3 + [6]*8 + [7]*16 +[8]*32
+
+def encode_distance(x):
+    ''' Encode an integer or an array of integers as a (bined) one-hot numpy array '''
+    def _encode_distance(d):
+        ''' Encode an integer as a (bined) one-hot numpy array '''
+        dist_vect = np.zeros((11,))
+        if d < 64:
+            dist_vect[DISTANCE_BINS[d]] = 1
+        else:
+            dist_vect[9] = 1
+        dist_vect[10] = min(float(d), 64.0) / 64.0
+        return dist_vect
+
+    if isinstance(x, np.ndarray):
+        arr_l = [_encode_distance(y)[np.newaxis, :] for y in x]
+        out_arr = np.concatenate(arr_l)
+    else:
+        out_arr = _encode_distance(x)
+    return out_arr
 
 def parallel_process(array, function, n_jobs=16, use_kwargs=False, front_num=10):
     """
@@ -46,33 +66,13 @@ def parallel_process(array, function, n_jobs=16, use_kwargs=False, front_num=10)
             'leave': True
         }
         #Print out the progress as tasks complete
-        for f in tqdm(as_completed(futures), **kwargs):
+        for _ in tqdm(as_completed(futures), **kwargs):
             pass
     out = []
     #Get the results from the futures. 
-    for i, future in tqdm(enumerate(futures)):
+    for future in tqdm(futures):
         try:
             out.append(future.result())
         except Exception as e:
             out.append(e)
     return front + out
-
-def mention_detection_debug(sentence):
-    print(u"🌋 Loading spacy model")
-    try:
-        spacy.info('en_core_web_sm')
-        model = 'en_core_web_sm'
-    except IOError:
-        print("No spacy 2 model detected, using spacy1 'en' model")
-        spacy.info('en')
-        model = 'en'
-    nlp = spacy.load(model)
-    doc = nlp(sentence.decode('utf-8'))
-    mentions = extract_mentions_spans(doc, use_no_coref_list=False, debug=True)
-    for mention in mentions:
-        print(mention)
-
-if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        sent = sys.argv[1]
-        mention_detection_debug(sent)

@@ -9,8 +9,8 @@ import os
 import spacy
 import numpy as np
 
-from compat import unicode_
-from document import Document, MENTION_TYPE, NO_COREF_LIST
+from neuralcoref.compat import unicode_
+from neuralcoref.document import Document, MENTION_TYPE, NO_COREF_LIST
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
@@ -30,51 +30,35 @@ class Model(object):
         weights, biases = [], []
         for file in sorted(os.listdir(model_path)):
             if file.startswith("single_mention_weights"):
-                weights.append(np.load(os.path.join(model_path, file)))
+                w = np.load(os.path.join(model_path, file))
+                weights.append(w)
             if file.startswith("single_mention_bias"):
-                biases.append(np.load(os.path.join(model_path, file)))
+                w = np.load(os.path.join(model_path, file))
+                biases.append(w)
         self.single_mention_model = list(zip(weights, biases))
         weights, biases = [], []
         for file in sorted(os.listdir(model_path)):
             if file.startswith("pair_mentions_weights"):
-                weights.append(np.load(os.path.join(model_path, file)))
+                w = np.load(os.path.join(model_path, file))
+                weights.append(w)
             if file.startswith("pair_mentions_bias"):
-                biases.append(np.load(os.path.join(model_path, file)))
+                w = np.load(os.path.join(model_path, file))
+                biases.append(w)
         self.pair_mentions_model = list(zip(weights, biases))
 
-    def _score(self, features, layers, debug=True):
-        if debug:
-            print("single_input.size", features.shape)
-            print("single_input", unicode_(features[0:8]))
+    def _score(self, features, layers):
         for weights, bias in layers:
             features = np.matmul(weights, features) + bias
             if weights.shape[0] > 1:
                 features = np.maximum(features, 0) # ReLU
-            if debug:
-                print("single_top_layer")
-                print("single_top_layer.weight.size", weights.shape)
-                print("self.single_top_layer.weight", weights[0:8, 0])
-                print("single_top_layer.bias.size", bias.shape)
-                print("self.single_top_layer.bias", bias[0:8, 0])
-                print("features out shape", unicode_(features.shape))
-                print("features out", unicode_(features[0:8]))
-        score = np.sum(features)
-        if debug: print("score", score)
-        sys.exit()
-        return score
+        return np.sum(features)
 
-    def get_single_mention_score(self, mention, single_features):
-        print("📚 mention", mention)
-        print("mention.spans_embeddings", mention.spans_embeddings[0:8])
-        print("mention.words_embeddings.shape", mention.words_embeddings.shape)
-        print("mention.words_embeddings", mention.words_embeddings[::50])
-        print("mention.single_features", mention.features[0:8])
+    def get_single_mention_score(self, mention, anaphoricity_features):
         first_layer_input = np.concatenate([mention.embedding,
-                                            single_features], axis=0)[:, np.newaxis]
+                                            anaphoricity_features], axis=0)[:, np.newaxis]
         return self._score(first_layer_input, self.single_mention_model)
 
     def get_pair_mentions_score(self, antecedent, mention, pair_features):
-        print("📚 PAIR ", mention, antecedent)
         first_layer_input = np.concatenate([antecedent.embedding,
                                             mention.embedding,
                                             pair_features], axis=0)[:, np.newaxis]
@@ -86,36 +70,26 @@ class Coref(object):
     Main coreference resolution algorithm
     '''
     def __init__(self, nlp=None, greedyness=0.5, max_dist=50, max_dist_match=500, conll=None,
-                 use_no_coref_list=True, coref_model=None, data=None, debug=False):
+                 use_no_coref_list=True, debug=False):
         self.greedyness = greedyness
         self.max_dist = max_dist
         self.max_dist_match = max_dist_match
         self.debug = debug
-        
-        if coref_model is None:
-            model_path = os.path.join(PACKAGE_DIRECTORY, "weights/conll/" if conll is not None else "weights/")
-            print("loading model from", model_path)
-            self.coref_model = Model(model_path)
-        else:
-            self.coref_model = coref_model
-
-        if data is None:
-            if nlp is None:
-                print("Loading spacy model")
-                try:
-                    spacy.info('en_core_web_sm')
-                    model = 'en_core_web_sm'
-                except IOError:
-                    print("No spacy 2 model detected, using spacy1 'en' model")
-                    spacy.info('en')
-                    model = 'en'
-                nlp = spacy.load(model)
-
-            #embed_model_path = os.path.join(PACKAGE_DIRECTORY, "weights/")
-            self.data = Document(nlp, conll=conll, use_no_coref_list=use_no_coref_list)
-        else:
-            self.data = data
-
+        model_path = os.path.join(PACKAGE_DIRECTORY, "weights/conll/" if conll is not None else "weights/")
+        trained_embed_path = os.path.join(PACKAGE_DIRECTORY, "weights/")
+        print("Loading neuralcoref model from", model_path)
+        self.coref_model = Model(model_path)
+        if nlp is None:
+            print("Loading spacy model")
+            try:
+                spacy.info('en_core_web_sm')
+                model = 'en_core_web_sm'
+            except IOError:
+                print("No spacy 2 model detected, using spacy1 'en' model")
+                spacy.info('en')
+                model = 'en'
+            nlp = spacy.load(model)
+        self.data = Document(nlp, conll=conll, use_no_coref_list=use_no_coref_list, trained_embed_path=trained_embed_path)
         self.clusters = {}
         self.mention_to_cluster = []
         self.mentions_single_scores = {}
@@ -191,7 +165,6 @@ class Coref(object):
             single_score = self.coref_model.get_single_mention_score(mention, ana_feats)
             self.mentions_single_scores[mention_idx] = single_score
             self.mentions_single_features[mention_idx] = {"spansEmbeddings": mention.spans_embeddings_, "wordsEmbeddings": mention.words_embeddings_, "features": feats_}
-
             best_score = single_score - 50 * (self.greedyness - 0.5)
             for ant_idx in ant_list:
                 antecedent = self.data[ant_idx]
@@ -202,7 +175,6 @@ class Coref(object):
                                                                       "antecedentWordsEmbeddings": antecedent.words_embeddings_,
                                                                       "mentionSpansEmbeddings": mention.spans_embeddings_,
                                                                       "mentionWordsEmbeddings": mention.words_embeddings_ }
-
                 if score > best_score:
                     best_score = score
                     best_ant[mention_idx] = ant_idx
@@ -376,3 +348,19 @@ class Coref(object):
                         representative = mention
 
         return coreferences
+
+if __name__ == '__main__':
+    coref = Coref(use_no_coref_list=False)
+    if len(sys.argv) > 1:
+        sent = sys.argv[1]
+        coref.one_shot_coref(sent)
+    else:
+        coref.one_shot_coref(u"Yes, I noticed that many friends, around me received it. It seems that almost everyone received this SMS.")#u"My sister has a dog. She loves him.")
+    mentions = coref.get_mentions()
+    print(mentions)
+
+    utterances = coref.get_utterances()
+    print(utterances)
+
+    resolved_utterance_text = coref.get_resolved_utterances()
+    print(resolved_utterance_text)

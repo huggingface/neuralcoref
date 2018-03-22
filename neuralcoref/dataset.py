@@ -6,8 +6,6 @@ from __future__ import print_function
 
 import os
 import io
-import collections
-import pickle
 import numpy as np
 
 import torch
@@ -15,10 +13,9 @@ import torch.utils.data
 
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset
-from torch.utils.data.dataloader import numpy_type_map, string_classes
 
-from document import encode_distance
-from conllparser import FEATURES_NAMES
+from neuralcoref.utils import encode_distance
+from neuralcoref.conllparser import FEATURES_NAMES
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 BATCH_SIZE_PATH = os.path.join(PACKAGE_DIRECTORY, "test_batch_size.txt") #fernandes.txt")#

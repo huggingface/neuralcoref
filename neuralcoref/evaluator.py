@@ -9,20 +9,14 @@ import subprocess
 import io
 #import concurrent.futures
 import pickle
-import numpy as np
 
-from tqdm import tqdm
-
-import torch
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
 #from algorithm import Coref
-from document import EmbeddingExtractor
-from conllparser import ConllCorpus, mention_words_idx, FEATURES_NAMES
-from dataset import NCDataset, NCBatchSampler, padder_collate
-from compat import unicode_
-from utils import parallel_process
+from neuralcoref.conllparser import FEATURES_NAMES
+from neuralcoref.dataset import NCBatchSampler, padder_collate
+from neuralcoref.compat import unicode_
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 

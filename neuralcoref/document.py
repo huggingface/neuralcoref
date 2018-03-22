@@ -8,7 +8,8 @@ import re
 import io
 from six import string_types, integer_types
 
-from compat import unicode_
+from neuralcoref.compat import unicode_
+from neuralcoref.utils import encode_distance
 
 try:
     from itertools import izip_longest as zip_longest
@@ -32,27 +33,7 @@ ACCEPTED_ENTS = ["PERSON", "NORP", "FACILITY", "ORG", "GPE", "LOC", "PRODUCT", "
 WHITESPACE_PATTERN = r"\s+|_+"
 UNKNOWN_WORD = "*UNK*"
 MISSING_WORD = "<missing>"
-DISTANCE_BINS = list(range(5)) + [5]*3 + [6]*8 + [7]*16 +[8]*32
 MAX_ITER = 100
-
-def encode_distance(x):
-    ''' Encode an integer or an array of integers as a (bined) one-hot numpy array '''
-    def _encode_distance(d):
-        ''' Encode an integer as a (bined) one-hot numpy array '''
-        dist_vect = np.zeros((11,))
-        if d < 64:
-            dist_vect[DISTANCE_BINS[d]] = 1
-        else:
-            dist_vect[9] = 1
-        dist_vect[10] = min(float(d), 64.0) / 64.0
-        return dist_vect
-
-    if isinstance(x, np.ndarray):
-        arr_l = [_encode_distance(y)[np.newaxis, :] for y in x]
-        out_arr = np.concatenate(arr_l)
-    else:
-        out_arr = _encode_distance(x)
-    return out_arr
 
 #########################
 ## MENTION EXTRACTION ###
@@ -282,8 +263,8 @@ class Mention(spacy.tokens.Span):
 
     def _doc_sent_number(self):
         ''' Index of the sentence of the Mention in the current utterance'''
-        for i, sent in enumerate(self.doc.sents):
-            if sent == self.sent:
+        for i, s in enumerate(self.doc.sents):
+            if s == self.sent:
                 return i
         return None
 
@@ -383,7 +364,7 @@ class EmbeddingExtractor:
 
     @staticmethod
     def load_embeddings_from_file(name):
-        print("Loading embeddings of", name)
+        print("Loading embeddings from", name)
         embeddings = {}
         voc_to_idx = {}
         idx_to_voc = []
@@ -448,22 +429,22 @@ class EmbeddingExtractor:
 
     def get_mention_embeddings(self, mention, doc_embedding):
         ''' Get span (averaged) and word (single) embeddings of a mention '''
-        sent = mention.sent
-        mention_lefts = mention.doc[max(mention.start-5, sent.start):mention.start]
-        mention_rights = mention.doc[mention.end:min(mention.end+5, sent.end)]
+        st = mention.sent
+        mention_lefts = mention.doc[max(mention.start-5, st.start):mention.start]
+        mention_rights = mention.doc[mention.end:min(mention.end+5, st.end)]
         head = mention.root.head
         spans = [self.get_average_embedding(mention),
                  self.get_average_embedding(mention_lefts),
                  self.get_average_embedding(mention_rights),
-                 self.get_average_embedding(sent),
+                 self.get_average_embedding(st),
                  (unicode_(doc_embedding[0:8]) + "...", doc_embedding)]
         words = [self.get_word_embedding(mention.root),
                  self.get_word_embedding(mention[0]),
                  self.get_word_embedding(mention[-1]),
-                 self.get_word_in_sentence(mention.start-1, sent),
-                 self.get_word_in_sentence(mention.end, sent),
-                 self.get_word_in_sentence(mention.start-2, sent),
-                 self.get_word_in_sentence(mention.end+1, sent),
+                 self.get_word_in_sentence(mention.start-1, st),
+                 self.get_word_in_sentence(mention.end, st),
+                 self.get_word_in_sentence(mention.start-2, st),
+                 self.get_word_in_sentence(mention.end+1, st),
                  self.get_word_embedding(head)]
         spans_embeddings_ = {"00_Mention": spans[0][0],
                              "01_MentionLeft": spans[1][0],
@@ -480,8 +461,8 @@ class EmbeddingExtractor:
                              "07_MentionRootHead": words[7][0]}
         return (spans_embeddings_,
                 words_embeddings_,
-                np.concatenate([em[1] for em in spans], axis=0)[:, np.newaxis],
-                np.concatenate([em[1] for em in words], axis=0)[:, np.newaxis])
+                np.concatenate([em[1] for em in spans], axis=0),
+                np.concatenate([em[1] for em in words], axis=0))
 
 class Document(object):
     '''
@@ -490,7 +471,7 @@ class Document(object):
     '''
     def __init__(self, nlp, utterances=None, utterances_speaker=None, speakers_names=None,
                  use_no_coref_list=False, consider_speakers=False,
-                 pretrained_model_path=None, embedding_extractor=None,
+                 trained_embed_path=None, embedding_extractor=None,
                  conll=None, debug=False):
         '''
         Arguments:
@@ -518,8 +499,8 @@ class Document(object):
 
         self.genre_, self.genre = self.set_genre(conll)
 
-        if pretrained_model_path is not None and embedding_extractor is None:
-            self.embed_extractor = EmbeddingExtractor(pretrained_model_path)
+        if trained_embed_path is not None and embedding_extractor is None:
+            self.embed_extractor = EmbeddingExtractor(trained_embed_path)
         elif embedding_extractor is not None:
             self.embed_extractor = embedding_extractor
         else:
@@ -742,3 +723,25 @@ class Document(object):
                         if match_idx < i and match_idx >= i - max_distance_with_match:
                             antecedents.add(match_idx)
             yield i, antecedents
+
+def mention_detection_debug(sentence):
+    print(u"🌋 Loading spacy model")
+    try:
+        spacy.info('en_core_web_sm')
+        model = 'en_core_web_sm'
+    except IOError:
+        print("No spacy 2 model detected, using spacy1 'en' model")
+        spacy.info('en')
+        model = 'en'
+    nlp = spacy.load(model)
+    doc = nlp(sentence.decode('utf-8'))
+    mentions = extract_mentions_spans(doc, use_no_coref_list=False, debug=True)
+    for mention in mentions:
+        print(mention)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        sent = sys.argv[1]
+        mention_detection_debug(sent)
+    else:
+        mention_detection_debug(u"My sister has a dog. She loves him.")

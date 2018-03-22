@@ -4,12 +4,10 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from __future__ import print_function
 
-import sys
 import os
 import time
 import argparse
-from pprint import pprint
-
+import socket
 from datetime import datetime
 import numpy as np
 
@@ -18,22 +16,20 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.optim import RMSprop
 from torch.utils.data import DataLoader
-
-from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
-from model import Model
-from dataset import (NCDataset, NCBatchSampler,
+from neuralcoref.model import Model
+from neuralcoref.dataset import (NCDataset, NCBatchSampler,
     load_embeddings_from_file, padder_collate,
     SIZE_PAIR_IN, SIZE_SINGLE_IN, SIZE_EMBEDDING)
-from evaluator import ConllEvaluator
+from neuralcoref.evaluator import ConllEvaluator
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
-SAVE_PATH = os.path.join(PACKAGE_DIRECTORY, "checkpoints/")
+STAGES = ["allpairs", "toppairs", "ranking"]
 
-def clipped_sigmoid(scores):
+def clipped_sigmoid(inputs):
     epsilon = 1.0e-7
-    return torch.sigmoid(scores).clamp(epsilon, 1.0 - epsilon)
+    return torch.sigmoid(inputs).clamp(epsilon, 1.0 - epsilon)
 
 def get_all_pairs_loss(n):
     def all_pair_loss(scores, targets):
@@ -84,6 +80,22 @@ def get_ranking_loss(n):
         out_score = torch.sum(loss)
         return out_score / n
     return ranking_loss
+
+def decrease_lr(optim_func, factor=0.1, min_lrs=0, eps=0, verbose=True):
+    for i, param_group in enumerate(optim_func.param_groups):
+        old_lr = float(param_group['lr'])
+        new_lr = max(old_lr * factor, min_lrs)
+        if old_lr - new_lr > eps:
+            param_group['lr'] = new_lr
+            if verbose:
+                print('Reducing learning rate'
+                      ' of group {} to {:.4e}.'.format(i, new_lr))
+    return new_lr
+
+def load_model(model, path):
+    print("⛄️ Reloading model from", path)
+    model.load_state_dict(torch.load(path) if args.cuda \
+        else torch.load(path, map_location=lambda storage, loc: storage))
 
 def run_model(args):
     print("Training for", args.all_pairs_epoch,
@@ -139,9 +151,11 @@ def run_model(args):
     print("🏝 Start training")
     g_step = 0
     start_from = args.startstep if args.startstep is not None and args.startstage is not None else 0
-    def run_epochs(start_epoch, end_epoch, loss_func, optim_func, save_name, g_step, debug=None):
+    def run_epochs(start_epoch, end_epoch, loss_func, optim_func, save_name, lr, g_step, debug=None):
+        best_model_path = args.save_path + "best_model" + save_name
         start_time_all = time.time()
         best_f1_conll = 0
+        lower_eval = 0
         for epoch in range(start_epoch, end_epoch):
             """ Run an epoch """
             print("🚘 {} Epoch {:d}".format(save_name, epoch))
@@ -173,6 +187,8 @@ def run_model(args):
                 epoch_loss += loss.data[0]
                 optim_func.step()
                 writer.add_scalar("train/" + save_name + "_loss", loss.data[0], g_step)
+                writer.add_scalar("meta/" + "lr", lr, g_step)
+                writer.add_scalar("meta/" + "stage", STAGES.index(save_name), g_step)
                 g_step += 1
                 if batch_i % args.log_interval == 0 and batch_i > 0:
                     elapsed = time.time() - start_time_log
@@ -181,7 +197,6 @@ def run_model(args):
                         epoch, batch_i, len(dataloader), optim_func.param_groups[0]['lr'],
                         elapsed * 1000 / args.log_interval, loss.data[0]))
                     start_time_log = time.time()
-
             elapsed_all = time.time() - start_time_all
             elapsed_epoch = time.time() - start_time_epoch
             print('|| min/epoch {:5.2f} | est. remaining time (h) {:5.2f} | loss {:.2e}'.format(elapsed_epoch/60,
@@ -202,12 +217,23 @@ def run_model(args):
                 print('|| min/evaluation {:5.2f}'.format(elapsed/60))
                 writer.add_scalar("eval/" + "F1_conll", f1_conll, g_step)
                 g_step += 1
-                save_path = SAVE_PATH + save_name + "_" + str(epoch)
+                save_path = args.save_path + save_name + "_" + str(epoch)
                 torch.save(model.state_dict(), save_path)
                 if f1_conll > best_f1_conll:
                     best_f1_conll = f1_conll
-                    save_path = SAVE_PATH + "best_model" + save_name
-                    torch.save(model.state_dict(), save_path)
+                    torch.save(model.state_dict(), best_model_path)
+                    lower_eval = 0
+                elif args.on_eval_decrease != 'nothing':
+                    print("Evaluation metric decreases")
+                    lower_eval += 1
+                    if lower_eval >= args.patience:
+                        if args.on_eval_decrease == 'divide_lr' or args.on_eval_decrease == 'divide_then_next':
+                            print("reload best model and decrease lr")
+                            load_model(model, best_model_path)
+                            lr = decrease_lr(optim_func)
+                        if args.on_eval_decrease == 'next_stage' or lr <= args.min_lr:
+                            print("Switch to next stage")
+                            break
         # Save last step
         start_time = time.time()
         eval_evaluator.build_test_file()
@@ -216,29 +242,30 @@ def run_model(args):
         print('|| min/evaluation {:5.2f}'.format(elapsed/60))
         writer.add_scalar("eval/" + "F1_conll", f1_conll, g_step)
         g_step += 1
-        save_path = SAVE_PATH + save_name + "_" + str(epoch)
+        save_path = args.save_path + save_name + "_" + str(epoch)
         torch.save(model.state_dict(), save_path)
+        load_model(model, best_model_path)
         return g_step
 
     if args.startstage is None or args.startstage == "allpairs":
         optimizer = RMSprop(model.parameters(), lr=args.all_pairs_lr, weight_decay=args.all_pairs_l2)
         loss_func = get_all_pairs_loss(batch_sampler.pairs_per_batch)
         g_step = run_epochs(start_from, args.all_pairs_epoch, loss_func, optimizer,
-                            "allpairs", g_step)
+                            "allpairs", args.all_pairs_lr, g_step)
         start_from = 0
 
     if args.startstage is None or args.startstage in ["allpairs", "toppairs"]:
         optimizer = RMSprop(model.parameters(), lr=args.top_pairs_lr, weight_decay=args.top_pairs_l2)
         loss_func = get_top_pair_loss(10 * batch_sampler.mentions_per_batch)
         g_step = run_epochs(start_from, args.top_pairs_epoch, loss_func, optimizer,
-                            "toppairs", g_step)
+                            "toppairs", args.top_pairs_lr, g_step)
         start_from = 0
 
     if args.startstage is None or args.startstage in ["ranking", "allpairs", "toppairs"]:
         optimizer = RMSprop(model.parameters(), lr=args.ranking_lr, weight_decay=args.ranking_l2)
         loss_func = get_ranking_loss(batch_sampler.mentions_per_batch)
         g_step = run_epochs(start_from, args.ranking_epoch, loss_func, optimizer,
-                            "ranking", g_step)
+                            "ranking", args.ranking_lr, g_step)
 
 if __name__ == '__main__':
     DIR_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -262,18 +289,25 @@ if __name__ == '__main__':
     parser.add_argument('--h1', type=int, default=1000, help='number of hidden unit on layer 1')
     parser.add_argument('--h2', type=int, default=500, help='number of hidden unit on layer 2')
     parser.add_argument('--h3', type=int, default=500, help='number of hidden unit on layer 3')
-    parser.add_argument('--all_pairs_epoch', type=int, default=150, help='number of epochs for all-pairs pre-training')
-    parser.add_argument('--top_pairs_epoch', type=int, default=50, help='number of epochs for top-pairs pre-training')
-    parser.add_argument('--ranking_epoch', type=int, default=100, help='number of epochs for ranking training')
+    parser.add_argument('--all_pairs_epoch', type=int, default=200, help='number of epochs for all-pairs pre-training')
+    parser.add_argument('--top_pairs_epoch', type=int, default=200, help='number of epochs for top-pairs pre-training')
+    parser.add_argument('--ranking_epoch', type=int, default=200, help='number of epochs for ranking training')
     parser.add_argument('--all_pairs_lr', type=float, default=2e-4, help='all pairs pre-training learning rate')
     parser.add_argument('--top_pairs_lr', type=float, default=2e-4, help='top pairs pre-training learning rate')
     parser.add_argument('--ranking_lr', type=float, default=2e-6, help='ranking training learning rate')
     parser.add_argument('--all_pairs_l2', type=float, default=1e-6, help='all pairs pre-training l2 regularization')
     parser.add_argument('--top_pairs_l2', type=float, default=1e-5, help='top pairs pre-training l2 regularization')
     parser.add_argument('--ranking_l2', type=float, default=1e-5, help='ranking training l2 regularization')
+    parser.add_argument('--patience', type=int, default=3, help='patience (epochs) before considering evaluationhas decreased')
+    parser.add_argument('--min_lr', type=float, default=2e-8, help='min learning rate')
+    parser.add_argument('--on_eval_decrease', type=str, default='nothing',
+                        help='What to do when evaluation decreases ("nothing", "divide_lr", "next_stage", "divide_then_next")')
     args = parser.parse_args()
 
     args.costs = {'FN': args.costfn, 'FL': args.costfl, 'WL' : args.costwl }
+
+    current_time = datetime.now().strftime('%b%d_%H-%M-%S')
+    args.save_path = os.path.join('checkpoints', current_time + '_' + socket.gethostname() + '_')
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)

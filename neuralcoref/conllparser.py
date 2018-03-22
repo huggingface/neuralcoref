@@ -12,7 +12,6 @@ import argparse
 import time
 import os
 import io
-#import concurrent.futures
 import pickle
 
 import spacy
@@ -23,11 +22,10 @@ import numpy as np
 from pprint import pprint
 from tqdm import tqdm
 
-from compat import unicode_
-from document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
-from utils import parallel_process
+from neuralcoref.compat import unicode_
+from neuralcoref.document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
+from neuralcoref.utils import parallel_process
 
-#max_distance = 1000 # Limit the retreival distance to 1000 spaced coreferences
 PACKAGE_DIRECTORY = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REMOVED_CHAR = ["/", "%", "*"]
 NORMALIZE_DICT = {"/.": ".",
@@ -57,7 +55,7 @@ FEATURES_NAMES = ["mentions_features",          # 0
                   ]
 
 MISSED_MENTIONS_FILE = os.path.join(PACKAGE_DIRECTORY, "test_mentions_identification.txt")
-SENTENCES_PATH = os.path.join(PACKAGE_DIRECTORY, "test_sentences.txt") #fernandes.txt")#
+SENTENCES_PATH = os.path.join(PACKAGE_DIRECTORY, "test_sentences.txt")
 
 ###################
 ### UTILITIES #####
@@ -73,54 +71,6 @@ def clean_token(token):
         cleaned_token = ","
     return cleaned_token
 
-def align_tokens(spacy_tokens, conll_tokens, doc_name, debug=False):
-    """
-        Not used right now as spacy 2 has trouble merging tokens
-        (see https://github.com/explosion/spaCy/issues/1547)
-    """
-    c_t = 0
-    s_t = 0
-    cur_tok = 0
-    no_missing_token = True
-    l = len(spacy_tokens)
-    while cur_tok < l:
-        if debug:
-            out_str = "spacy token [" + spacy_tokens[cur_tok].text + \
-                      "] of length " + unicode_(len(spacy_tokens[cur_tok].text))
-            print(out_str)
-        if no_missing_token:
-            if spacy_tokens[cur_tok].text == conll_tokens[c_t]:
-                if debug: print("found in", conll_tokens[c_t])
-                c_t += 1
-            else:
-                if debug:
-                    out_str = "NOT aligned with [" + conll_tokens[c_t] \
-                              + "] of length " + unicode_(len(conll_tokens[c_t]))
-                    print(out_str)
-                s_t = cur_tok
-                no_missing_token = False
-        else:
-            if debug:
-                out_str = "spacy span [" + spacy_tokens[s_t:cur_tok+1].text \
-                          + "] compared with conll token [" + conll_tokens[c_t] + "]"
-                print(out_str)
-            if spacy_tokens[s_t:cur_tok+1].text == conll_tokens[c_t]:
-                if debug: print("found in", conll_tokens[c_t])
-                spacy_tokens[s_t:cur_tok+1].merge()
-                no_missing_token = True
-                c_t += 1
-                cur_tok = s_t
-                l = len(spacy_tokens)
-        cur_tok += 1
-    if not no_missing_token:
-        out_str = "spacy utterance:" + unicode_(list(spacy_tokens)) + \
-                    "\n conll tokens:" + unicode_(conll_tokens) + \
-                    "\n on spacy token:" + spacy_tokens[s_t:cur_tok].text + \
-                    "\n comparing with conll token:" + conll_tokens[c_t] + \
-                    "\n doc:" + doc_name
-        raise ValueError("Error aligning tokens on " + out_str)
-    return spacy_tokens
-
 def mention_words_idx(embed_extractor, mention, debug=False):
     # index of the word in the tuned embeddings no need for normalizing,
     # it is already performed in set_mentions_features()
@@ -132,12 +82,10 @@ def mention_words_idx(embed_extractor, mention, debug=False):
             words.append(MISSING_WORD)
         else:
             words.append(w)
-    # return np.array([embed_extractor.tun_idx[w] for w in words], ndmin=2)
     return [embed_extractor.tun_idx[w] for w in words]
 
 def check_numpy_array(feature, array, n_mentions_list, compressed=True):
-    m_i = 0
-    for i, n_mentions in enumerate(n_mentions_list):
+    for n_mentions in n_mentions_list:
         if feature == FEATURES_NAMES[0]:
             assert array.shape[0] == len(n_mentions)
             if compressed:
@@ -169,31 +117,22 @@ def check_numpy_array(feature, array, n_mentions_list, compressed=True):
 
 ###############################################################################################
 ### PARALLEL FCT (has to be at top-level of the module to be pickled for multiprocessing) #####
-
-def set_feats(doc):
-    doc.set_mentions_features()
-
-def get_feats(doc, i):
-    return doc.get_feature_array(doc_id=i)
-
-def gather_feats(gathering_array, array, feat_name, pairs_ant_index, pairs_start_index):
-    if gathering_array is None:
-        gathering_array = array
-    else:
-        if feat_name == FEATURES_NAMES[6]:
-            array = [a + pairs_ant_index for a in array]
-        elif feat_name == FEATURES_NAMES[3]:
-            array = [a + pairs_start_index for a in array]
-        gathering_array += array
-    return feat_name, gathering_array
-
-def read_file(full_name):
-    doc = ""
-    with io.open(full_name, 'rt', encoding='utf-8', errors='strict') as f:
-        doc = f.read()
-    return doc
-
 def load_file(full_name, debug=False):
+    '''
+    load a *._conll file
+    Input: full_name: path to the file
+    Output: list of tuples for each conll doc in the file, where the tuple contains:
+        (utts_text ([str]): list of the utterances in the document 
+         utts_tokens ([[str]]): list of the tokens (conll words) in the document 
+         utts_corefs: list of coref objects (dicts) with the following properties:
+            coref['label']: id of the coreference cluster,
+            coref['start']: start index (index of first token in the utterance),
+            coref['end': end index (index of last token in the utterance).
+         utts_speakers ([str]): list of the speaker associated to each utterances in the document 
+         name (str): name of the document
+         part (str): part of the document
+        )
+    '''
     docs = []
     with io.open(full_name, 'rt', encoding='utf-8', errors='strict') as f:
         lines = list(f)#.readlines()
@@ -292,6 +231,29 @@ def load_file(full_name, debug=False):
             else:
                 raise ValueError("Line not standard " + line)
     return docs
+
+def set_feats(doc):
+    doc.set_mentions_features()
+
+def get_feats(doc, i):
+    return doc.get_feature_array(doc_id=i)
+
+def gather_feats(gathering_array, array, feat_name, pairs_ant_index, pairs_start_index):
+    if gathering_array is None:
+        gathering_array = array
+    else:
+        if feat_name == FEATURES_NAMES[6]:
+            array = [a + pairs_ant_index for a in array]
+        elif feat_name == FEATURES_NAMES[3]:
+            array = [a + pairs_start_index for a in array]
+        gathering_array += array
+    return feat_name, gathering_array
+
+def read_file(full_name):
+    doc = ""
+    with io.open(full_name, 'rt', encoding='utf-8', errors='strict') as f:
+        doc = f.read()
+    return doc
 
 ###################
 ### ConllDoc #####
@@ -708,10 +670,8 @@ class ConllCorpus(object):
                                            self.utts_tokens, self.utts_corefs,
                                            self.utts_speakers, self.utts_doc_idx)):
             spacy_tokens, conll_tokens, corefs, speaker, doc_id = utt_tuple
-            # Remove align_tokens from now as spacy 2 has trouble merging tokens
-            # (see https://github.com/explosion/spaCy/issues/1547)
             if debug: print(unicode_(self.docs_names[doc_id]), "-", spacy_tokens)
-            doc = spacy_tokens #align_tokens(spacy_tokens, conll_tokens, unicode_(self.docs_names[doc_id]))
+            doc = spacy_tokens
             if debug: 
                 out_str = "utterance " + unicode_(doc) + " corefs " + unicode_(corefs) + \
                           " speaker " + unicode_(speaker) + "doc_id" + unicode_(doc_id)
@@ -791,7 +751,7 @@ if __name__ == '__main__':
     DIR_PATH = os.path.dirname(os.path.realpath(__file__))
     parser = argparse.ArgumentParser(description='Training the neural coreference model')
     parser.add_argument('--function', type=str, default='all', help='Function ("all", "key", "parse", "find_undetected")')
-    parser.add_argument('--path', type=str, default=DIR_PATH + '/data/tiny/', help='Path to the dataset')
+    parser.add_argument('--path', type=str, default=DIR_PATH + '/data/', help='Path to the dataset')
     parser.add_argument('--key', type=str, help='Path to an optional key file for scoring')
     parser.add_argument('--n_jobs', type=int, default=1, help='Number of parallel jobs (default 1)')
     args = parser.parse_args()
