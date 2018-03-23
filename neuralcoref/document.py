@@ -5,7 +5,11 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 import re
+import io
 from six import string_types, integer_types
+
+from neuralcoref.compat import unicode_
+from neuralcoref.utils import encode_distance
 
 try:
     from itertools import izip_longest as zip_longest
@@ -28,19 +32,8 @@ PROPERS_TAGS = ["NN", "NNS", "NNP", "NNPS"]
 ACCEPTED_ENTS = ["PERSON", "NORP", "FACILITY", "ORG", "GPE", "LOC", "PRODUCT", "EVENT", "WORK_OF_ART", "LANGUAGE"]
 WHITESPACE_PATTERN = r"\s+|_+"
 UNKNOWN_WORD = "*UNK*"
-NORMALIZE_DICT = {"/.": ".", "/?": "?", "-LRB-": "(", "-RRB-": ")",
-                  "-LCB-": "{", "-RCB-": "}", "-LSB-": "[", "-RSB-": "]"}
-DISTANCE_BINS = list(range(5)) + [5]*3 + [6]*8 + [7]*16 +[8]*32
-
-def encode_distance(d):
-    ''' Encode an integer as a (bined) one-hot numpy array '''
-    dist_vect = np.zeros((11,))
-    if d < 64:
-        dist_vect[DISTANCE_BINS[d]] = 1
-    else:
-        dist_vect[9] = 1
-    dist_vect[10] = min(float(d), 64.0) / 64.0
-    return dist_vect
+MISSING_WORD = "<missing>"
+MAX_ITER = 100
 
 #########################
 ## MENTION EXTRACTION ###
@@ -50,20 +43,28 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
     '''
     Extract potential mentions from a spacy parsed Doc
     '''
-    nouns_or_prp = re.compile(r"N.*|PRP.*|DT")
-    det_or_comp = ["det", "compound", "appos"]
+    keep_tags = re.compile(r"N.*|PRP.*|DT|IN")
+    leave_dep = ["det", "compound", "appos"]
+    keep_dep = ["nsubj", "dobj", "iobj", "pobj"]
     nsubj_or_dep = ["nsubj", "dep"]
-    conj_punct_pos = ["CCONJ", "PUNCT"]
+    conj_or_prep = ["conj", "prep"]
+    remove_pos = ["CCONJ", "INTJ", "ADP"]
+    lower_not_end = ["'s", ',', '.', '!', '?', ':', ';']
 
     # Utility to remove bad endings
     def cleanup_endings(left, right, token):
-        minchild_idx = min(left) if left else token.i
-        maxchild_idx = max(right) if right else token.i
+        minchild_idx = min(left + [token.i]) if left else token.i
+        maxchild_idx = max(right + [token.i]) if right else token.i
         # Clean up endings and begginging
-        while maxchild_idx >= token.i and (doc[maxchild_idx].pos_ in conj_punct_pos or doc[maxchild_idx].lower_ == "'s"):
+        while maxchild_idx >= minchild_idx and (doc[maxchild_idx].pos_ in remove_pos
+                                           or doc[maxchild_idx].lower_ in lower_not_end):
             if debug: print("Removing last token", doc[maxchild_idx].lower_, doc[maxchild_idx].tag_)
             maxchild_idx -= 1 # We don't want mentions finishing with 's or conjunctions/punctuation
-        return min(minchild_idx, token.i), max(maxchild_idx, token.i)+1
+        while minchild_idx <= maxchild_idx and (doc[minchild_idx].pos_ in remove_pos 
+                                           or doc[minchild_idx].lower_ in lower_not_end):
+            if debug: print("Removing first token", doc[minchild_idx].lower_, doc[minchild_idx].tag_)
+            minchild_idx += 1 # We don't want mentions starting with 's or conjunctions/punctuation
+        return minchild_idx, maxchild_idx+1
 
     if debug: print('===== doc ====:', doc)
     for c in doc:
@@ -74,12 +75,12 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
 
     # Pronouns and Noun phrases
     for token in doc:
-        if debug: print("🚀 tok:", token, "tok.tag_", token.tag_)
+        if debug: print("🚀 tok:", token, "tok.tag_:", token.tag_, "tok.pos_:", token.pos_, "tok.dep_:", token.dep_)
 
         if use_no_coref_list and token.lower_ in NO_COREF_LIST:
             if debug: print("token in no_coref_list")
             continue
-        if not nouns_or_prp.match(token.tag_) or token.dep_ in det_or_comp:
+        if (not keep_tags.match(token.tag_) or token.dep_ in leave_dep) and not token.dep_ in keep_dep:
             if debug: print("not pronoun or no right dependency")
             continue
 
@@ -89,9 +90,7 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
             endIdx = token.i + 1
 
             span = doc[token.i: endIdx]
-            if not any((ent.start <= span.start and span.end <= ent.end for ent in doc.ents)):
-                if debug: print("==-- not in entity store:", span)
-                mentions_spans.append(span)
+            mentions_spans.append(span)
 
             # when pronoun is a part of conjunction (e.g., you and I)
             if token.n_rights > 0 or token.n_lefts > 0:
@@ -101,17 +100,23 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
             continue
 
         # Add NP mention
-        if debug: print("NP", token.lower_)
+        if debug:
+            print("NP or IN:", token.lower_)
+            if token.tag_ == 'IN':
+                print("IN tag")
         # Take care of 's
         if token.lower_ == "'s":
             if debug: print("'s detected")
             h = token.head
-            while h.head is not h:
-                if debug: print("token head", h, h.dep_, "head:", h.head)
+            j = 0
+            while h.head.i != h.i and j < MAX_ITER:
+                if debug:
+                    print("token head:", h, h.dep_, "head:", h.head)
+                    print(id(h.head), id(h))
                 if h.dep_ == "nsubj":
-                    minchild_idx = min((c.left_edge.i for c in doc if c.head == h.head and c.dep_ in nsubj_or_dep),
+                    minchild_idx = min((c.left_edge.i for c in doc if c.head.i == h.head.i and c.dep_ in nsubj_or_dep),
                                        default=token.i)
-                    maxchild_idx = max((c.right_edge.i for c in doc if c.head == h.head and c.dep_ in nsubj_or_dep),
+                    maxchild_idx = max((c.right_edge.i for c in doc if c.head.i == h.head.i and c.dep_ in nsubj_or_dep),
                                        default=token.i)
                     if debug: print("'s', i1:", doc[minchild_idx], " i2:", doc[maxchild_idx])
                     span = doc[minchild_idx : maxchild_idx+1]
@@ -119,32 +124,49 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
                     mentions_spans.append(span)
                     break
                 h = h.head
+                j += 1
+            assert j != MAX_ITER
             continue
 
         # clean up
         for c in doc:
-            if debug and c.head == token: print("🚧 token in span", c, c.head, c.dep_)
-        left = list(c.left_edge.i for c in doc if c.head == token)
-        if debug: print("left side", left)
-        right = list(c.right_edge.i for c in doc if c.head == token)
-        if debug: print("right side", right)
+            if debug and c.head.i == token.i: print("🚧 token in span:", c, "- head & dep:", c.head, c.dep_)
+        left = list(c.left_edge.i for c in doc if c.head.i == token.i)
+        right = list(c.right_edge.i for c in doc if c.head.i == token.i)
+        if token.tag_ == 'IN' and token.dep_ == "mark" and len(left) == 0 and len(right) == 0:
+            left = list(c.left_edge.i for c in doc if c.head.i == token.head.i)
+            right = list(c.right_edge.i for c in doc if c.head.i == token.head.i)
+        if debug:
+            print("left side:", left)
+            print("right side:", right)
+            minchild_idx = min(left) if left else token.i
+            maxchild_idx = max(right) if right else token.i
+            print("full span:", doc[minchild_idx:maxchild_idx+1])
         start, end = cleanup_endings(left, right, token)
+        if start == end:
+            continue
         if doc[start].lower_ == "'s":
             continue # we probably already have stored this mention
         span = doc[start:end]
-        if debug: print("==-- full span store:", span)
+        if debug:
+            print("cleaned endings span:", doc[start:end])
+            print("==-- full span store:", span)
         mentions_spans.append(span)
-        if any(tok.dep_ == "conj" for tok in span):
+        if debug and token.tag_ == 'IN':
+            print("IN tag")
+        if any(tok.dep_ in conj_or_prep for tok in span):
             if debug: print("Conjunction found, storing first element separately")
             for c in doc:
-                if c.head == token and c.dep_ != "conj":
-                    if debug: print("left no conj", c, c.dep_, c.left_edge)
-                    if debug: print("right no conj", c, c.dep_, c.right_edge)
-            left_no_conj = list(c.left_edge.i for c in doc if c.head == token and c.dep_ != "conj")
-            right_no_conj = list(c.right_edge.i for c in doc if c.head == token and c.dep_ != "conj")
-            if debug: print("left side no conj", [doc[i] for i in left_no_conj])
-            if debug: print("right side no conj", [doc[i] for i in right_no_conj])
+                if c.head.i == token.i and c.dep_ not in conj_or_prep:
+                    if debug: print("left no conj:", c, 'dep & edge:', c.dep_, c.left_edge)
+                    if debug: print("right no conj:", c, 'dep & edge:', c.dep_, c.right_edge)
+            left_no_conj = list(c.left_edge.i for c in doc if c.head.i == token.i and c.dep_ not in conj_or_prep)
+            right_no_conj = list(c.right_edge.i for c in doc if c.head.i == token.i and c.dep_ not in conj_or_prep)
+            if debug: print("left side no conj:", [doc[i] for i in left_no_conj])
+            if debug: print("right side no conj:", [doc[i] for i in right_no_conj])
             start, end = cleanup_endings(left_no_conj, right_no_conj, token)
+            if start == end:
+                continue
             span = doc[start:end]
             if debug: print("==-- full span store:", span)
             mentions_spans.append(span)
@@ -152,7 +174,7 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
     spans_set = set()
     cleaned_mentions_spans = []
     for spans in mentions_spans:
-        if (spans.start, spans.end) not in spans_set:
+        if spans.end > spans.start and (spans.start, spans.end) not in spans_set:
             cleaned_mentions_spans.append(spans)
             spans_set.add((spans.start, spans.end))
 
@@ -170,7 +192,18 @@ class Mention(spacy.tokens.Span):
         obj = spacy.tokens.Span.__new__(cls, span.doc, span.start, span.end, *args, **kwargs)
         return obj
 
-    def __init__(self, span, mention_index, utterance_index, utterances_start_sent, speaker=None, gold_label=None):
+    def __init__(self, span, mention_index, utterance_index, utterances_start_sent,
+                 speaker=None, gold_label=None):
+        '''
+        Arguments:
+            span (spaCy Span): the spaCy span from which creating the Mention object
+            mention_index (int): index of the Mention in the Document
+            utterance_index (int): index of the utterance of the Mention in the Document
+            utterances_start_sent (int): index of the first sentence of the utterance of the Mention in the Document
+                (an utterance can comprise several sentences)
+            speaker (Speaker): the speaker of the mention
+            gold_label (anything): a gold label associated to the Mention (for training)
+        '''
         self.index = mention_index
         self.utterance_index = utterance_index
         self.utterances_sent = utterances_start_sent + self._doc_sent_number()
@@ -230,8 +263,8 @@ class Mention(spacy.tokens.Span):
 
     def _doc_sent_number(self):
         ''' Index of the sentence of the Mention in the current utterance'''
-        for i, sent in enumerate(self.doc.sents):
-            if sent == self.sent:
+        for i, s in enumerate(self.doc.sents):
+            if s == self.sent:
                 return i
         return None
 
@@ -261,7 +294,7 @@ class Mention(spacy.tokens.Span):
             return self.speaker.speaker_matches_mention(mention2, strict_match=False)
         return False
 
-class Speaker:
+class Speaker(object):
     '''
     A speaker with its names, list of mentions and matching test functions
     '''
@@ -269,13 +302,13 @@ class Speaker:
         self.mentions = []
         self.speaker_id = speaker_id
         if speaker_names is None:
-            self.speaker_names = [str(speaker_id)]
+            self.speaker_names = [unicode_(speaker_id)]
         elif isinstance(speaker_names, string_types):
             self.speaker_names = [speaker_names]
         elif len(speaker_names) > 1:
             self.speaker_names = speaker_names
         else:
-            self.speaker_names = str(speaker_names)
+            self.speaker_names = unicode_(speaker_names)
         self.speaker_tokens = [tok.lower() for s in self.speaker_names for tok in re.split(WHITESPACE_PATTERN, s)]
 
     def __str__(self):
@@ -320,9 +353,9 @@ class EmbeddingExtractor:
     '''
     Compute words embedding features for mentions
     '''
-    def __init__(self, model_path):
-        self.average_mean, self.static_embeddings, self.static_voc = self.load_embeddings_from_file(model_path + "static_word")
-        _, self.tuned_embeddings, self.tuned_voc = self.load_embeddings_from_file(model_path + "tuned_word")
+    def __init__(self, pretrained_model_path):
+        _, self.static_embeddings, self.stat_idx, self.stat_voc = self.load_embeddings_from_file(pretrained_model_path + "static_word")
+        _, self.tuned_embeddings, self.tun_idx, self.tun_voc = self.load_embeddings_from_file(pretrained_model_path + "tuned_word")
         self.fallback = self.static_embeddings.get(UNKNOWN_WORD)
 
         self.shape = self.static_embeddings[UNKNOWN_WORD].shape
@@ -331,23 +364,24 @@ class EmbeddingExtractor:
 
     @staticmethod
     def load_embeddings_from_file(name):
+        print("Loading embeddings from", name)
         embeddings = {}
-        voc = {}
+        voc_to_idx = {}
+        idx_to_voc = []
         mat = np.load(name+"_embeddings.npy")
         average_mean = np.average(mat, axis=0, weights=np.sum(mat, axis=1))
-        with open(name+"_vocabulary.txt", encoding="utf8") as f:
+        with io.open(name+"_vocabulary.txt", 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 embeddings[line.strip()] = mat[i, :]
-                voc[line.strip()] = i
-        return average_mean, embeddings, voc
+                voc_to_idx[line.strip()] = i
+                idx_to_voc.append(line.strip())
+        return average_mean, embeddings, voc_to_idx, idx_to_voc
 
     @staticmethod
     def normalize_word(w):
         if w is None:
-            return "<missing>"
-        elif w.lower_ in NORMALIZE_DICT:
-            return NORMALIZE_DICT[w.lower_]
-        return w.lower_.replace("\\d", "0")
+            return MISSING_WORD
+        return re.sub(r"\d", u"0", w.lower_)
 
     def get_document_embedding(self, utterances_list):
         ''' Embedding for the document '''
@@ -355,31 +389,27 @@ class EmbeddingExtractor:
     #    return embed_vector
         embed_vector = np.zeros(self.shape)
         for utt in utterances_list:
-            embed_vector += self.get_average_embedding(utt)
+            _, utt_embed = self.get_average_embedding(utt)
+            embed_vector += utt_embed
         return embed_vector/max(len(utterances_list), 1)
+
+    def get_stat_word(self, word):
+        if word in self.static_embeddings:
+            return word, self.static_embeddings.get(word)
+        else:
+            return UNKNOWN_WORD, self.fallback
 
     def get_word_embedding(self, word, static=False):
         ''' Embedding for a single word (tuned if possible, otherwise static) '''
         norm_word = self.normalize_word(word)
         if static:
-            if norm_word in self.static_embeddings:
-                word = norm_word
-                embed = self.static_embeddings.get(norm_word)
-            else:
-                word = UNKNOWN_WORD
-                embed = self.fallback
+            return self.get_stat_word(norm_word)
         else:
             if norm_word in self.tuned_embeddings:
-                word = norm_word
-                embed = self.tuned_embeddings.get(norm_word)
-            elif norm_word in self.static_embeddings:
-                word = norm_word
-                embed = self.static_embeddings.get(norm_word)
+                return norm_word, self.tuned_embeddings.get(norm_word)
             else:
-                word = UNKNOWN_WORD
-                embed = self.fallback
-        return word, embed
-
+                return self.get_stat_word(norm_word)
+ 
     def get_word_in_sentence(self, word_idx, sentence):
         ''' Embedding for a word in a sentence '''
         if word_idx < sentence.start or word_idx >= sentence.end:
@@ -398,84 +428,99 @@ class EmbeddingExtractor:
         return word_list, (embed_vector/max(len(word_list), 1))
 
     def get_mention_embeddings(self, mention, doc_embedding):
-        ''' Embedding for a mention '''
-        sent = mention.sent
-        mention_lefts = mention.doc[max(mention.start-5, sent.start):mention.start]
-        mention_rights = mention.doc[mention.end:min(mention.end+5, sent.end)]
+        ''' Get span (averaged) and word (single) embeddings of a mention '''
+        st = mention.sent
+        mention_lefts = mention.doc[max(mention.start-5, st.start):mention.start]
+        mention_rights = mention.doc[mention.end:min(mention.end+5, st.end)]
         head = mention.root.head
         spans = [self.get_average_embedding(mention),
                  self.get_average_embedding(mention_lefts),
                  self.get_average_embedding(mention_rights),
-                 self.get_average_embedding(sent),
-                 (str(doc_embedding[0:8]) + "...", doc_embedding)]
+                 self.get_average_embedding(st),
+                 (unicode_(doc_embedding[0:8]) + "...", doc_embedding)]
         words = [self.get_word_embedding(mention.root),
                  self.get_word_embedding(mention[0]),
                  self.get_word_embedding(mention[-1]),
-                 self.get_word_in_sentence(mention.start-1, sent),
-                 self.get_word_in_sentence(mention.end, sent),
-                 self.get_word_in_sentence(mention.start-2, sent),
-                 self.get_word_in_sentence(mention.end+1, sent),
+                 self.get_word_in_sentence(mention.start-1, st),
+                 self.get_word_in_sentence(mention.end, st),
+                 self.get_word_in_sentence(mention.start-2, st),
+                 self.get_word_in_sentence(mention.end+1, st),
                  self.get_word_embedding(head)]
-        spans_embeddings_ = {"Mention": spans[0][0],
-                             "MentionLeft": spans[1][0],
-                             "MentionRight": spans[2][0],
-                             "Sentence": spans[3][0],
-                             "Doc": spans[4][0]}
-        words_embeddings_ = {"MentionHead": words[0][0],
-                             "MentionFirstWord": words[1][0],
-                             "MentionLastWord": words[2][0],
-                             "PreviousWord": words[3][0],
-                             "NextWord": words[4][0],
-                             "SecondPreviousWord": words[5][0],
-                             "SecondNextWord": words[6][0],
-                             "MentionRootHead": words[7][0]}
+        spans_embeddings_ = {"00_Mention": spans[0][0],
+                             "01_MentionLeft": spans[1][0],
+                             "02_MentionRight": spans[2][0],
+                             "03_Sentence": spans[3][0],
+                             "04_Doc": spans[4][0]}
+        words_embeddings_ = {"00_MentionHead": words[0][0],
+                             "01_MentionFirstWord": words[1][0],
+                             "02_MentionLastWord": words[2][0],
+                             "03_PreviousWord": words[3][0],
+                             "04_NextWord": words[4][0],
+                             "05_SecondPreviousWord": words[5][0],
+                             "06_SecondNextWord": words[6][0],
+                             "07_MentionRootHead": words[7][0]}
         return (spans_embeddings_,
                 words_embeddings_,
-                np.concatenate(list(em[1] for em in spans), axis=0)[: np.newaxis],
-                np.concatenate(list(em[1] for em in words), axis=0)[: np.newaxis])
+                np.concatenate([em[1] for em in spans], axis=0),
+                np.concatenate([em[1] for em in words], axis=0))
 
-class Data:
+class Document(object):
     '''
     Main data class: encapsulate list of utterances, mentions and speakers
     Process utterances to extract mentions and pre-compute mentions features
     '''
-    def __init__(self, nlp, model_path=None, conll=None, utterances=None, utterances_speaker=None,
-                 speakers_names=None, use_no_coref_list=True, consider_speakers=False ,debug=False):
+    def __init__(self, nlp, utterances=None, utterances_speaker=None, speakers_names=None,
+                 use_no_coref_list=False, consider_speakers=False,
+                 trained_embed_path=None, embedding_extractor=None,
+                 conll=None, debug=False):
+        '''
+        Arguments:
+            nlp (spaCy Language Class): A spaCy Language Class for processing the text input
+            utterances: utterance(s) to load already see self.add_utterances()
+            utterances_speaker: speaker(s) of utterance(s) to load already see self.add_utterances()
+            speakers_names: speaker(s) of utterance(s) to load already see self.add_utterances()
+            use_no_coref_list (boolean): use a list of term for which coreference is not preformed
+            consider_speakers (boolean): consider speakers informations
+            pretrained_model_path (string): Path to a folder with pretrained word embeddings
+            embedding_extractor (EmbeddingExtractor): Use a pre-loaded word embeddings extractor
+            conll (string): If training on coNLL data: identifier of the document type
+            debug (boolean): print debug informations
+        '''
         self.nlp = nlp
         self.use_no_coref_list = use_no_coref_list
         self.utterances = []
         self.utterances_speaker = []
-        self.last_utterances_loaded = None
+        self.last_utterances_loaded = []
         self.mentions = []
         self.speakers = {}
         self.n_sents = 0
         self.debug = debug
-        self.consider_speakers = consider_speakers
+        self.consider_speakers = consider_speakers or conll is not None
 
-        self.genre_ = conll
-        if conll is not None:
-            self.genre = np.zeros((7,))
-            genres = {"bc": 0, "bn": 1, "mz": 2, "nw": 3, "pt": 4, "tc": 5, "wb": 6}
-            #. We take broadcast conversations to use speaker infos
-            self.genre[genres[conll]] = 1
-        else:
-            self.genre = np.array(0, ndmin=1, copy=False)
-        
-        if model_path is not None:
-            self.embed_extractor = EmbeddingExtractor(model_path)
-            assert self.embed_extractor.shape is not None
-            self.doc_embedding = np.zeros(self.embed_extractor.shape)
+        self.genre_, self.genre = self.set_genre(conll)
+
+        if trained_embed_path is not None and embedding_extractor is None:
+            self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+        elif embedding_extractor is not None:
+            self.embed_extractor = embedding_extractor
         else:
             self.embed_extractor = None
-            self.doc_embedding = None
 
         if utterances:
             self.add_utterances(utterances, utterances_speaker, speakers_names)
 
+    def set_genre(self, conll):
+        if conll is not None:
+            genre = np.zeros((7,))
+            genre[conll] = 1
+        else:
+            genre = np.array(0, ndmin=1, copy=False)
+        return conll, genre
+
     def __str__(self):
         return '<utterances, speakers> \n {}\n<mentions> \n {}' \
-                .format('\n '.join(str(i) + " " + str(s) for i, s in zip(self.utterances, self.utterances_speaker)),
-                        '\n '.join(str(i) + " " + str(i.speaker) for i in self.mentions))
+                .format('\n '.join(unicode_(i) + " " + unicode_(s) for i, s in zip(self.utterances, self.utterances_speaker)),
+                        '\n '.join(unicode_(i) + " " + unicode_(i.speaker) for i in self.mentions))
 
     def __len__(self):
         ''' Return the number of mentions (not utterances) since it is what we really care about '''
@@ -527,7 +572,16 @@ class Data:
             utterances_speaker = ((i + a + 1) % 2 for i in range(len(utterances)))
         utterances_index = []
         utt_start = len(self.utterances)
-        for utt_index, (doc, speaker_id) in enumerate(zip_longest(self.nlp.pipe(utterances), utterances_speaker)):
+        for utt_index, (utterance, speaker_id) in enumerate(zip_longest(utterances, utterances_speaker)):
+            if utterance is None:
+                break
+            # Pipe currently broken in spacy 2 alpha
+            # Also, spacy 2 currently throws an exception on empty strings
+            try:
+                doc = self.nlp(utterance)
+            except IndexError:
+                doc = self.nlp(u" ")
+                if self.debug: print("Empty string")
             if speaker_id not in self.speakers:
                 speaker_name = speakers_names.get(speaker_id, None) if speakers_names else None
                 self.speakers[speaker_id] = Speaker(speaker_id, speaker_name)
@@ -559,24 +613,24 @@ class Data:
         '''
         Compute features for the extracted mentions
         '''
-        #TODO : we should probably update doc embedding here (not used currently)
+        doc_embedding = self.embed_extractor.get_document_embedding(self.utterances) if self.embed_extractor is not None else None
         for mention in self.mentions:
             one_hot_type = np.zeros((4,))
             one_hot_type[mention.mention_type] = 1
-            features_ = {"MentionType": mention.mention_type,
-                         "MentionLength": len(mention)-1,
-                         "MentionNormLocation": (mention.index)/len(self.mentions),
-                         "IsMentionNested": 1 if any((m is not mention
+            features_ = {"01_MentionType": mention.mention_type,
+                         "02_MentionLength": len(mention)-1,
+                         "03_MentionNormLocation": (mention.index)/len(self.mentions),
+                         "04_IsMentionNested": 1 if any((m is not mention
                                                           and m.utterances_sent == mention.utterances_sent
                                                           and m.start <= mention.start
                                                           and mention.end <= m.end)
                                                          for m in self.mentions) else 0}
             features = np.concatenate([one_hot_type,
-                                       encode_distance(features_["MentionLength"]),
-                                       np.array(features_["MentionNormLocation"], ndmin=1, copy=False),
-                                       np.array(features_["IsMentionNested"], ndmin=1, copy=False)
+                                       encode_distance(features_["02_MentionLength"]),
+                                       np.array(features_["03_MentionNormLocation"], ndmin=1, copy=False),
+                                       np.array(features_["04_IsMentionNested"], ndmin=1, copy=False)
                                       ], axis=0)
-            spans_embeddings_, words_embeddings_, spans_embeddings, words_embeddings = self.embed_extractor.get_mention_embeddings(mention, self.doc_embedding)
+            spans_embeddings_, words_embeddings_, spans_embeddings, words_embeddings = self.embed_extractor.get_mention_embeddings(mention, doc_embedding)
             mention.features_ = features_
             mention.features = features
             mention.spans_embeddings = spans_embeddings
@@ -592,27 +646,27 @@ class Data:
 
     def get_pair_mentions_features(self, m1, m2):
         ''' Features for pair of mentions (same speakers, speaker mentioned, string match)'''
-        features_ = {"SameSpeaker": 1 if self.consider_speakers and m1.speaker == m2.speaker else 0,
-                     "AntMatchMentionSpeaker": 1 if self.consider_speakers and m2.speaker_match_mention(m1) else 0,
-                     "MentionMatchSpeaker": 1 if self.consider_speakers and m1.speaker_match_mention(m2) else 0,
-                     "HeadsAgree": 1 if m1.heads_agree(m2) else 0,
-                     "ExactStringMatch": 1 if m1.exact_match(m2) else 0,
-                     "RelaxedStringMatch": 1 if m1.relaxed_match(m2) else 0,
-                     "SentenceDistance": m2.utterances_sent - m1.utterances_sent,
-                     "MentionDistance": 1, #m2.index - m1.index - 1,
-                     "Overlapping": 1 if (m1.utterances_sent == m2.utterances_sent and m1.end > m2.start) else 0,
-                     "M1Features": m1.features_,
-                     "M2Features": m2.features_,
-                     "DocGenre": self.genre_}
-        pairwise_features = [np.array([features_["SameSpeaker"],
-                                       features_["AntMatchMentionSpeaker"],
-                                       features_["MentionMatchSpeaker"],
-                                       features_["HeadsAgree"],
-                                       features_["ExactStringMatch"],
-                                       features_["RelaxedStringMatch"]]),
-                             encode_distance(features_["SentenceDistance"]),
-                             encode_distance(features_["MentionDistance"]),
-                             np.array(features_["Overlapping"], ndmin=1),
+        features_ = {"00_SameSpeaker": 1 if self.consider_speakers and m1.speaker == m2.speaker else 0,
+                     "01_AntMatchMentionSpeaker": 1 if self.consider_speakers and m2.speaker_match_mention(m1) else 0,
+                     "02_MentionMatchSpeaker": 1 if self.consider_speakers and m1.speaker_match_mention(m2) else 0,
+                     "03_HeadsAgree": 1 if m1.heads_agree(m2) else 0,
+                     "04_ExactStringMatch": 1 if m1.exact_match(m2) else 0,
+                     "05_RelaxedStringMatch": 1 if m1.relaxed_match(m2) else 0,
+                     "06_SentenceDistance": m2.utterances_sent - m1.utterances_sent,
+                     "07_MentionDistance": m2.index - m1.index - 1,
+                     "08_Overlapping": 1 if (m1.utterances_sent == m2.utterances_sent and m1.end > m2.start) else 0,
+                     "09_M1Features": m1.features_,
+                     "10_M2Features": m2.features_,
+                     "11_DocGenre": self.genre_}
+        pairwise_features = [np.array([features_["00_SameSpeaker"],
+                                       features_["01_AntMatchMentionSpeaker"],
+                                       features_["02_MentionMatchSpeaker"],
+                                       features_["03_HeadsAgree"],
+                                       features_["04_ExactStringMatch"],
+                                       features_["05_RelaxedStringMatch"]]),
+                             encode_distance(features_["06_SentenceDistance"]),
+                             encode_distance(features_["07_MentionDistance"]),
+                             np.array(features_["08_Overlapping"], ndmin=1),
                              m1.features,
                              m2.features,
                              self.genre]
@@ -636,7 +690,7 @@ class Data:
             for i in iterator:
                 yield i
 
-    def get_candidate_pairs(self, mentions=None, max_distance=50, max_distance_with_match=500):
+    def get_candidate_pairs(self, mentions=None, max_distance=50, max_distance_with_match=500, debug=False):
         '''
         Yield tuples of mentions, dictionnary of candidate antecedents for the mention
 
@@ -648,21 +702,46 @@ class Data:
         '''
         if mentions is None:
             mentions = range(len(self.mentions))
+        if debug: print("get_candidate_pairs: mentions", mentions)
+        
+        if max_distance_with_match is not None:
+            word_to_mentions = {}
+            for i in mentions:
+                for tok in self.mentions[i].content_words:
+                    if not tok in word_to_mentions:
+                        word_to_mentions[tok] = [i]
+                    else:
+                        word_to_mentions[tok].append(i)
 
-        word_to_mentions = {}
         for i in mentions:
-            for tok in self.mentions[i].content_words:
-                if not tok in word_to_mentions:
-                    word_to_mentions[tok] = [i]
-                else:
-                    word_to_mentions[tok].append(i)
+            antecedents = set(range(i)) if max_distance is None else set(range(max(0, i - max_distance), i))
+            if debug: print("antecedents", antecedents)
+            if max_distance_with_match is not None:
+                for tok in self.mentions[i].content_words:
+                    with_string_match = word_to_mentions.get(tok, None)
+                    for match_idx in with_string_match:
+                        if match_idx < i and match_idx >= i - max_distance_with_match:
+                            antecedents.add(match_idx)
+            yield i, antecedents
 
-        for i in mentions:
-            antecedents = set(range(max(0, i - max_distance), i))
-            for tok in self.mentions[i].content_words:
-                with_string_match = word_to_mentions.get(tok, None)
-                for match_idx in with_string_match:
-                    if match_idx < i and match_idx >= i - max_distance_with_match:
-                        antecedents.add(match_idx)
-            if antecedents:
-                yield i, antecedents
+def mention_detection_debug(sentence):
+    print(u"🌋 Loading spacy model")
+    try:
+        spacy.info('en_core_web_sm')
+        model = 'en_core_web_sm'
+    except IOError:
+        print("No spacy 2 model detected, using spacy1 'en' model")
+        spacy.info('en')
+        model = 'en'
+    nlp = spacy.load(model)
+    doc = nlp(sentence.decode('utf-8'))
+    mentions = extract_mentions_spans(doc, use_no_coref_list=False, debug=True)
+    for mention in mentions:
+        print(mention)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        sent = sys.argv[1]
+        mention_detection_debug(sent)
+    else:
+        mention_detection_debug(u"My sister has a dog. She loves him.")

@@ -18,7 +18,6 @@ setup(name='neuralcoref',
         'Programming Language :: Python :: 3.5'
       ],
       install_requires=[
-      'numpy',
       'spacy',
       'falcon'],
       packages=['neuralcoref'],

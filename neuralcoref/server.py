@@ -6,15 +6,12 @@ A simple server serving the coreference system.
 from __future__ import unicode_literals
 
 import json
-import sys
 from wsgiref.simple_server import make_server
 import falcon
 
 from neuralcoref.algorithm import Coref
-from neuralcoref.data import MENTION_LABEL
-
-is_python2 = int(sys.version[0]) == 2
-unicode_ = unicode if is_python2 else str
+from neuralcoref.document import MENTION_LABEL
+from neuralcoref.compat import unicode_
 
 class CorefWrapper(Coref):
     def parse_and_get_mentions(self, utterances, utterances_speakers_id=None, context=None,

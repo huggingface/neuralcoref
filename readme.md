@@ -1,11 +1,11 @@
-# Neural coref
+# Neural coref v2.0
 
 State-of-the-art coreference resolution library using neural nets and spaCy. [Try it online !](https://huggingface.co/coref/)
 ![Neuralcoref demo](https://huggingface.co/coref/assets/thumbnail-large.png)
 
 This coreference resolution module is based on the super fast [spaCy](https://spacy.io/) parser and uses the neural net scoring model described in [Deep Reinforcement Learning for Mention-Ranking Coreference Models](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf) by Kevin Clark and Christopher D. Manning, EMNLP 2016.
 
-Be sure to check out [our medium post](https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30) in which we talk more about neuralcoref and coreference resolution.
+With ✨Neuralcoref v2.0, you should now be able to train  the coreference resolution system on your own dataset — e.g., another language than English! — **provided you have an annotated dataset**. Be sure to check [our medium post detailing the release of v2.0 and how to train the model](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe)  as well as our [first medium post](https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30) in which we talk more about coreference resolution in general.
 
 ## Installation
 Clone the repo and install using pip (the trained model weights are too large for PyPI)
@@ -16,13 +16,17 @@ cd neuralcoref
 pip install .
 ```
 
+The install script will install `spacy` and `falcon` (only used by the server).
 
-You will also need an English model for spaCy if you don't already have spaCy installed in your environment.
+You will also need an English model for spaCy if you don't already have one.
 ```
 python -m spacy download en
 ```
 
 The mention extraction module is strongly influenced by the quality of the parsing so we recommend selecting a model with a higher accuray than usual.
+
+## Re-train the model / Extend to another language
+If you want to retrain the model or train it on another language, see our detailed [training instructions](training.md) as well as our [detailed blog post](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe)
 
 ## Usage
 ### As a standalone server
