@@ -1,6 +1,6 @@
 # How to train and modify the neural coreference model
 
-Please check our [very detailed blog post](https://medium.com/huggingface/) together with these short notes.
+Please check our [detailed blog post](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe) together with these short notes.
 
 ## Install
 As always, we recommend creating a clean environment (conda or virtual env) to install and train the model.
@@ -57,7 +57,7 @@ python -m neuralcoref.learn --help
 You can follow the training by running [Tensorboard for pyTorch](https://github.com/lanpa/tensorboard-pytorch) (it requires a version of Tensorflow, any version will be fine). Run it with `tensorboard --logdir runs`.
 
 ## Some details on the training
-The model and the training as thoroughfully described in our [very detailed blog post](https://medium.com/huggingface/). The training process is similar to the mention-ranking training described in [Clark and Manning (2016)](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf), namely:
+The model and the training as thoroughfully described in our [very detailed blog post](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe). The training process is similar to the mention-ranking training described in [Clark and Manning (2016)](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf), namely:
 - A first step of training uses a standard cross entropy loss on the mention pair labels,
 - A second step of training uses a cross entropy loss on the top pairs only, and
 - A third step of training using a slack-rescaled ranking loss.
@@ -68,7 +68,7 @@ Traing the model with the default hyper-parameters reaches a test loss of about 
 
 Some possible explanations:
 - Our mention extraction function is a simple rule-based function (in [document.py](/document.py)) that was not extensively tuned on the CoNLL dataset and as a result only identify about 90% of the gold mentions in the CoNLL-2012 dataset (see the evaluation at the start of the training) thereby reducing the maximum possible score. Manually tuning a mention identification module can be a lengthy process that basically involves designing a lot of heuristics to prune spurious mentions which keeping a high recall (see for example the [rule-based mention extraction used in CoreNLP](http://www.aclweb.org/anthology/D10-1048)). An alternative is train an end-to-end identification module as used in the AllenAI coreference module but this is a lot more complex (you have to learn a pruning function) and the focus of the neuralcoref project is to have a coreference module with a good trade-off between accuracy and simplicity/speed.
-- The hyper-parameters and the optimization procedure has not been fully tuned and it is likely possible to find better hyper-parameters and smarter ways to optimize. One possibiility is to adjust the balance between the gradients backpropagated in the single-mention and the mentions-pair feedforward networks (see our [blog post](https://medium.com/huggingface/) for more details on the model architecture). Here again, we aimed for a balance between the accuracy and the training speed. As a result, the model trains in about 18h versus about a week for the original model of [Clark and Manning (2016)](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf) and 2 days for the current state-of-the-art model of AllenAI.
+- The hyper-parameters and the optimization procedure has not been fully tuned and it is likely possible to find better hyper-parameters and smarter ways to optimize. One possibiility is to adjust the balance between the gradients backpropagated in the single-mention and the mentions-pair feedforward networks (see our [blog post](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe) for more details on the model architecture). Here again, we aimed for a balance between the accuracy and the training speed. As a result, the model trains in about 18h versus about a week for the original model of [Clark and Manning (2016)](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf) and 2 days for the current state-of-the-art model of AllenAI.
 - Again for the sake of high throughput, the parse tree output by the [standard English model](https://spacy.io/models/en#en_core_web_sm) of spaCy 2 (that we used for these tests) are slightly less accurate than the carefully tuned CoreNLP pars trees (but they are way faster to compute!) and will lead to a slightly higher percentage of wrong parsing annotations.
 - Eventually, it may also be interesting to use newer wrod-vectors like the [ELMo](https://arxiv.org/abs/1802.05365) as they were shown to be able to increase the state-or-the-art corerefence model F1 test measure by more than 3 percents.
 
