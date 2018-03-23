@@ -307,7 +307,7 @@ if __name__ == '__main__':
     args.costs = {'FN': args.costfn, 'FL': args.costfl, 'WL' : args.costwl }
 
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-    args.save_path = os.path.join('checkpoints', current_time + '_' + socket.gethostname() + '_')
+    args.save_path = os.path.join(PACKAGE_DIRECTORY, 'checkpoints', current_time + '_' + socket.gethostname() + '_')
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)

@@ -207,7 +207,7 @@ class ConllEvaluator(object):
 
         # Write test file
         print("Writing in", out_path)
-        with io.open(out_path, 'w') as out_file:
+        with io.open(out_path, 'w', encoding='utf-8') as out_file:
             out_file.write(out_str)
 
     def get_score(self, file_path=OUT_PATH, debug=False):

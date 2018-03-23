@@ -1,4 +1,4 @@
-# Neural coref
+# Neural coref v2.0
 
 State-of-the-art coreference resolution library using neural nets and spaCy. [Try it online !](https://huggingface.co/coref/)
 ![Neuralcoref demo](https://huggingface.co/coref/assets/thumbnail-large.png)
@@ -16,13 +16,17 @@ cd neuralcoref
 pip install .
 ```
 
+The install script will install `spacy` and `falcon` (only used by the server).
 
-You will also need an English model for spaCy if you don't already have spaCy installed in your environment.
+You will also need an English model for spaCy if you don't already have one.
 ```
 python -m spacy download en
 ```
 
 The mention extraction module is strongly influenced by the quality of the parsing so we recommend selecting a model with a higher accuray than usual.
+
+## Re-train the model / Extend to another language
+If you want to retrain the model or train it on another language, see our detailed [training instructions](training.md) as well as our [very detailed blog post](https://medium.com/huggingface/)
 
 ## Usage
 ### As a standalone server

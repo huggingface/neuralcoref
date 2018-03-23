@@ -19,14 +19,13 @@ from spacy.tokens import Doc
 
 import numpy as np
 
-from pprint import pprint
 from tqdm import tqdm
 
 from neuralcoref.compat import unicode_
 from neuralcoref.document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
 from neuralcoref.utils import parallel_process
 
-PACKAGE_DIRECTORY = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]
 NORMALIZE_DICT = {"/.": ".",
                   "/?": "?",
@@ -370,9 +369,9 @@ class ConllDoc(Document):
                  ]
         return feat_l
 
-    def get_feature_array(self, doc_id, feature=None, compressed=True, debug=False):
+    def get_feature_array(self, doc_id, feature=None, compressed=True, debug=True):
         """
-        Prepare feature array where feature is one of:
+        Prepare feature array:
             mentions_spans: (N, S)
             mentions_words: (N, W)
             mentions_features: (N, Fs)
@@ -403,104 +402,47 @@ class ConllDoc(Document):
         for mention_idx, antecedents_idx in list(self.get_candidate_pairs(max_distance=None, max_distance_with_match=None)):
             n_mentions += 1
             mention = self.mentions[mention_idx]
-            if feature == FEATURES_NAMES[4] or feature is None:
-                mentions_spans.append(mention.spans_embeddings.transpose())
-            if feature == FEATURES_NAMES[5] or feature is None:
-                w_idx = mention_words_idx(self.embed_extractor, mention)
-                if w_idx is None:
-                    print("error in", self.name, self.part, mention.utterance_index)
-                mentions_words.append(w_idx)
-            if feature == FEATURES_NAMES[0] or feature is None:
-                mentions_features.append(self.get_single_mention_features_conll(mention, compressed))
-            if feature == FEATURES_NAMES[9] or feature is None:
-                mentions_location.append([mention.start, mention.end, mention.utterance_index, mention_idx, doc_id])
-            if feature not in [FEATURES_NAMES[4], FEATURES_NAMES[5], FEATURES_NAMES[0]] or feature is None:
-                ants = [self.mentions[ant_idx] for ant_idx in antecedents_idx]
-                no_antecedent = not any(ant.gold_label == mention.gold_label for ant in ants) or mention.gold_label is None
-                if antecedents_idx:
-                    if feature == FEATURES_NAMES[6] or feature is None:
-                        pairs_ant_idx += [idx for idx in antecedents_idx]
-                    if feature == FEATURES_NAMES[7] or feature is None:
-                        pairs_features += [self.get_pair_mentions_features_conll(ant, mention, compressed) for ant in ants]
-                    if feature == FEATURES_NAMES[8] or feature is None:
-                        ant_labels = [0 for ant in ants] if no_antecedent else [1 if ant.gold_label == mention.gold_label else 0 for ant in ants]
-                        pairs_labels += ant_labels
-                if feature == FEATURES_NAMES[1] or feature is None:
-                    mentions_labels.append(1 if no_antecedent else 0)
-                if feature == FEATURES_NAMES[3] or feature is None:
-                    mentions_pairs_start.append(total_pairs)
-                    total_pairs += len(ants)
-                if feature == FEATURES_NAMES[2] or feature is None:
-                    mentions_pairs_length.append(len(ants))
+            mentions_spans.append(mention.spans_embeddings)
+            w_idx = mention_words_idx(self.embed_extractor, mention)
+            if w_idx is None:
+                print("error in", self.name, self.part, mention.utterance_index)
+            mentions_words.append(w_idx)
+            mentions_features.append(self.get_single_mention_features_conll(mention, compressed))
+            mentions_location.append([mention.start, mention.end, mention.utterance_index, mention_idx, doc_id])
+            ants = [self.mentions[ant_idx] for ant_idx in antecedents_idx]
+            no_antecedent = not any(ant.gold_label == mention.gold_label for ant in ants) or mention.gold_label is None
+            if antecedents_idx:
+                pairs_ant_idx += [idx for idx in antecedents_idx]
+                pairs_features += [self.get_pair_mentions_features_conll(ant, mention, compressed) for ant in ants]
+                ant_labels = [0 for ant in ants] if no_antecedent else [1 if ant.gold_label == mention.gold_label else 0 for ant in ants]
+                pairs_labels += ant_labels
+            mentions_labels.append(1 if no_antecedent else 0)
+            mentions_pairs_start.append(total_pairs)
+            total_pairs += len(ants)
+            mentions_pairs_length.append(len(ants))
 
+        out_dict = {FEATURES_NAMES[0]: mentions_features,
+                    FEATURES_NAMES[1]: mentions_labels,
+                    FEATURES_NAMES[2]: mentions_pairs_length,
+                    FEATURES_NAMES[3]: mentions_pairs_start,
+                    FEATURES_NAMES[4]: mentions_spans,
+                    FEATURES_NAMES[5]: mentions_words,
+                    FEATURES_NAMES[6]: pairs_ant_idx if pairs_ant_idx else None,
+                    FEATURES_NAMES[7]: pairs_features if pairs_features else None,
+                    FEATURES_NAMES[8]: pairs_labels if pairs_labels else None,
+                    FEATURES_NAMES[9]: [mentions_location],
+                    FEATURES_NAMES[10]: [self.conll_tokens],
+                    FEATURES_NAMES[11]: [self.conll_lookup],
+                    FEATURES_NAMES[12]: [{'name': self.name,
+                                          'part': self.part,
+                                          'utterances': list(str(u) for u in self.utterances),
+                                          'mentions': list(str(m) for m in self.mentions)}],
+                    }
         if debug:
             print("🚘 Summary")
-            print(FEATURES_NAMES[4], np.concatenate(mentions_spans).shape)
-            print(FEATURES_NAMES[5], np.concatenate(mentions_words).shape)
-            print(FEATURES_NAMES[0], np.concatenate(mentions_features).shape)
-            print(FEATURES_NAMES[1], np.array(mentions_labels).shape)
-            print(FEATURES_NAMES[3], np.array(mentions_pairs_start).shape)
-            print(FEATURES_NAMES[2], np.array(mentions_pairs_length).shape)
-            print(FEATURES_NAMES[7], np.concatenate(pairs_features).shape if pairs_features else None)
-            print(FEATURES_NAMES[8], np.array(pairs_labels).shape if pairs_labels else None)
-            print(FEATURES_NAMES[6], np.array(pairs_ant_idx).shape if pairs_ant_idx else None)
-
-        if feature is not None:
-            if feature == FEATURES_NAMES[4]:
-                out_features = np.concatenate(mentions_spans)
-                assert out_features.shape[0] == len(self.mentions)
-            if feature == FEATURES_NAMES[5]:
-                out_features = np.concatenate(mentions_words)
-                assert out_features.shape[0] == len(self.mentions)
-            if feature == FEATURES_NAMES[0]:
-                out_features = np.concatenate(mentions_features)
-                assert out_features.shape[0] == len(self.mentions)
-                assert np.array_equiv(out_features[:, 3], np.array([len(self.mentions)] * len(self.mentions)))
-                assert np.max(out_features[:, 2]) == len(self.mentions)-1
-                assert np.min(out_features[:, 2]) == 0
-            if feature == FEATURES_NAMES[1]:
-                out_features = np.array(mentions_labels)
-                assert out_features.shape[0] == len(self.mentions)
-            if feature == FEATURES_NAMES[3]:
-                out_features = np.array(mentions_pairs_start)
-                assert out_features.shape[0] == len(self.mentions)
-                assert np.array_equiv(out_features[:, 0], np.array([p*(p-1)/2 for p in range(len(self.mentions))]))
-            if feature == FEATURES_NAMES[2]:
-                out_features = np.array(mentions_pairs_length)
-                assert out_features.shape[0] == len(self.mentions)
-                assert np.array_equiv(out_features[:, 0], np.array(list(range(len(self.mentions)))))
-            if feature == FEATURES_NAMES[7]:
-                out_features = np.concatenate(pairs_features) if pairs_features else None
-                assert out_features.shape[0] == len(self.mentions)*(len(self.mentions)-1)/2
-                assert np.max(out_features[:, 7]) == len(self.mentions)-2
-                assert np.min(out_features[:, 7]) == 0
-            if feature == FEATURES_NAMES[8]:
-                out_features = np.array(pairs_labels) if pairs_labels else None
-                assert out_features.shape[0] == len(self.mentions)*(len(self.mentions)-1)/2
-            if feature == FEATURES_NAMES[6]:
-                out_features = np.array(pairs_ant_idx) if pairs_ant_idx else None
-                assert out_features.shape[0] == len(self.mentions)*(len(self.mentions)-1)/2
-                assert np.max(out_features) == len(self.mentions)-2
-            return out_features
-        else:
-            out_dict = {FEATURES_NAMES[0]: mentions_features,
-                        FEATURES_NAMES[1]: mentions_labels,
-                        FEATURES_NAMES[2]: mentions_pairs_length,
-                        FEATURES_NAMES[3]: mentions_pairs_start,
-                        FEATURES_NAMES[4]: mentions_spans,
-                        FEATURES_NAMES[5]: mentions_words,
-                        FEATURES_NAMES[6]: pairs_ant_idx if pairs_ant_idx else None,
-                        FEATURES_NAMES[7]: pairs_features if pairs_features else None,
-                        FEATURES_NAMES[8]: pairs_labels if pairs_labels else None,
-                        FEATURES_NAMES[9]: [mentions_location],
-                        FEATURES_NAMES[10]: [self.conll_tokens],
-                        FEATURES_NAMES[11]: [self.conll_lookup],
-                        FEATURES_NAMES[12]: [{'name': self.name,
-                                              'part': self.part,
-                                              'utterances': list(str(u) for u in self.utterances),
-                                              'mentions': list(str(m) for m in self.mentions)}],
-                        }
-            return n_mentions, total_pairs, out_dict
+            for k, v in out_dict.items():
+                print(k, len(v))
+        return n_mentions, total_pairs, out_dict
 
 ###################
 ### ConllCorpus #####
@@ -601,7 +543,7 @@ class ConllCorpus(object):
     def list_undetected_mentions(self, data_path, save_file, debug=True):
         self.read_corpus(data_path)
         print("🌋 Listing undetected mentions")
-        with io.open(save_file, 'w') as out_file:
+        with io.open(save_file, 'w', encoding='utf-8') as out_file:
             for doc in tqdm(self.docs):
                 for name, part, utt_i, utt, coref in doc.missed_gold:
                     out_str = name + u"\t" + part + u"\t" + utt_i + u'\t"' + utt + u'"\n'
@@ -640,20 +582,17 @@ class ConllCorpus(object):
                     self.utts_speakers += utts_speakers
                     self.utts_doc_idx += [len(self.docs_names)] * len(utts_text)
                     self.docs_names.append((name, part))
-
         print("utts_text size", len(self.utts_text))
         print("utts_tokens size", len(self.utts_tokens))
         print("utts_corefs size", len(self.utts_corefs))
         print("utts_speakers size", len(self.utts_speakers))
         print("utts_doc_idx size", len(self.utts_doc_idx))
-
         print("🌋 Building docs")
         for name, part in self.docs_names:
             self.docs.append(ConllDoc(name=name, part=part, nlp=None,
                                       use_no_coref_list=False, consider_speakers=True,
                                       embedding_extractor=self.embed_extractor,
                                       conll=CONLL_GENRES[name[:2]]))
-
         print("🌋 Loading spacy model")
         try:
             spacy.info('en_core_web_sm')
@@ -663,7 +602,6 @@ class ConllCorpus(object):
             spacy.info('en')
             model = 'en'
         nlp = spacy.load(model)
-
         print("🌋 Parsing utterances and filling docs")
         doc_iter = (s for s in self.utts_text)
         for utt_tuple in tqdm(zip(nlp.pipe(doc_iter),
@@ -680,7 +618,7 @@ class ConllCorpus(object):
                                                   use_gold_mentions=self.use_gold_mentions)
 
     def build_and_gather_multiple_arrays(self, save_path):
-        print("🌋 Extracting mentions features")        
+        print("🌋 Extracting mentions features")
         parallel_process(self.docs, set_feats, n_jobs=self.n_jobs)
 
         print("🌋 Building and gathering arrays")
@@ -714,7 +652,7 @@ class ConllCorpus(object):
                 if array.ndim == 1:
                     array = np.expand_dims(array, axis=1)
             else:
-                array = np.concatenate(gathering_dict[feature], axis=0)
+                array = np.stack(gathering_dict[feature])
             # check_numpy_array(feature, array, n_mentions_list)
             print("Saving numpy", feature, "size", array.shape)
             np.save(save_path + feature, array)

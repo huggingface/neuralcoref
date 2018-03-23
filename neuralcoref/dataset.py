@@ -37,7 +37,7 @@ def load_embeddings_from_file(name):
     embed = torch.from_numpy(np.load(name+"_embeddings.npy")).float()
     print(embed.size())
     print("loading", name+"_vocabulary.txt")
-    with io.open(name+"_vocabulary.txt", 'r') as f:
+    with io.open(name+"_vocabulary.txt", 'r', encoding='utf-8') as f:
         voc = [line.strip() for line in f]
     return embed, voc
 

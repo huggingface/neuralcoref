@@ -14,6 +14,9 @@ __pycache__/
 /include/
 /lib/
 /pip-selfcheck.json
-neuralcoref/data/*
-neuralcoref/train/*
+/runs/*
+test_corefs.txt
+test_mentions.txt
 .cache
+/.vscode/*
+/.vscode
