@@ -49,6 +49,8 @@ def parallel_process(array, function, n_jobs=16, use_kwargs=False, front_num=10)
     #We run the first few iterations serially to catch bugs
     if front_num > 0:
         front = [function(**a) if use_kwargs else function(a) for a in array[:front_num]]
+    else:
+        front = []
     #If we set n_jobs to 1, just run a list comprehension. This is useful for benchmarking and debugging.
     if n_jobs==1:
         return front + [function(**a) if use_kwargs else function(a) for a in tqdm(array[front_num:])]

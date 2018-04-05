@@ -9,7 +9,7 @@ import io
 from six import string_types, integer_types
 
 from neuralcoref.compat import unicode_
-from neuralcoref.utils import encode_distance
+from neuralcoref.utils import encode_distance, parallel_process
 
 try:
     from itertools import izip_longest as zip_longest
@@ -43,6 +43,31 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
     '''
     Extract potential mentions from a spacy parsed Doc
     '''
+    if debug: print('===== doc ====:', doc)
+    for c in doc:
+        if debug: print("🚧 span search:", c, "head:", c.head, "tag:", c.tag_, "pos:", c.pos_, "dep:", c.dep_)
+    # Named entities
+    mentions_spans = list(ent for ent in doc.ents if ent.label_ in ACCEPTED_ENTS)
+
+    if debug: print("==-- ents:", list(((ent, ent.label_) for ent in mentions_spans)))
+    for spans in parallel_process([{'doc': doc,
+                                    'span': sent,
+                                    'use_no_coref_list': use_no_coref_list} for sent in doc.sents],
+                                _extract_from_sent, use_kwargs=True, front_num=0):
+        mentions_spans = mentions_spans + spans
+    spans_set = set()
+    cleaned_mentions_spans = []
+    for spans in mentions_spans:
+        if spans.end > spans.start and (spans.start, spans.end) not in spans_set:
+            cleaned_mentions_spans.append(spans)
+            spans_set.add((spans.start, spans.end))
+
+    return cleaned_mentions_spans
+
+def _extract_from_sent(doc, span, use_no_coref_list=True, debug=False):
+    '''
+    Extract Pronouns and Noun phrases mentions from a spacy Span
+    '''
     keep_tags = re.compile(r"N.*|PRP.*|DT|IN")
     leave_dep = ["det", "compound", "appos"]
     keep_dep = ["nsubj", "dobj", "iobj", "pobj"]
@@ -66,15 +91,8 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
             minchild_idx += 1 # We don't want mentions starting with 's or conjunctions/punctuation
         return minchild_idx, maxchild_idx+1
 
-    if debug: print('===== doc ====:', doc)
-    for c in doc:
-        if debug: print("🚧 span search:", c, "head:", c.head, "tag:", c.tag_, "pos:", c.pos_, "dep:", c.dep_)
-    # Named entities
-    mentions_spans = list(ent for ent in doc.ents if ent.label_ in ACCEPTED_ENTS)
-    if debug: print("==-- ents:", list(((ent, ent.label_) for ent in mentions_spans)))
-
-    # Pronouns and Noun phrases
-    for token in doc:
+    mentions_spans = []
+    for token in span:
         if debug: print("🚀 tok:", token, "tok.tag_:", token.tag_, "tok.pos_:", token.pos_, "tok.dep_:", token.dep_)
 
         if use_no_coref_list and token.lower_ in NO_COREF_LIST:
@@ -90,6 +108,7 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
             endIdx = token.i + 1
 
             span = doc[token.i: endIdx]
+            if debug: print("==-- PRP store:", span)
             mentions_spans.append(span)
 
             # when pronoun is a part of conjunction (e.g., you and I)
@@ -170,15 +189,8 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
             span = doc[start:end]
             if debug: print("==-- full span store:", span)
             mentions_spans.append(span)
-
-    spans_set = set()
-    cleaned_mentions_spans = []
-    for spans in mentions_spans:
-        if spans.end > spans.start and (spans.start, spans.end) not in spans_set:
-            cleaned_mentions_spans.append(spans)
-            spans_set.add((spans.start, spans.end))
-
-    return cleaned_mentions_spans
+    if debug: print("mentions_spans inside", mentions_spans)
+    return mentions_spans
 
 #########################
 ####### CLASSES #########
@@ -206,11 +218,9 @@ class Mention(spacy.tokens.Span):
         '''
         self.index = mention_index
         self.utterance_index = utterance_index
-        self.utterances_sent = utterances_start_sent + self._doc_sent_number()
+        self.utterances_sent = utterances_start_sent + self._get_doc_sent_number()
         self.speaker = speaker
         self.gold_label = gold_label
-        self.mention_type = self.find_type()
-
         self.spans_embeddings = None
         self.words_embeddings = None
         self.features = None
@@ -219,34 +229,23 @@ class Mention(spacy.tokens.Span):
         self.spans_embeddings_ = None
         self.words_embeddings_ = None
 
-    @property
-    def propers(self):
-        ''' Set of nouns and proper nouns in the Mention'''
-        return set(self.content_words)
+        self.mention_type = self._get_type()
+        self.propers = set(self.content_words)
+        self.entity_label = self._get_entity_label()
+        self.in_entities = self._get_in_entities()
 
-    @property
-    def entity_label(self):
+    def _get_entity_label(self):
         ''' Label of a detected named entity the Mention is nested in if any'''
         for ent in self.doc.ents:
             if ent.start <= self.start and self.end <= ent.end:
                 return ent.label
         return None
 
-    @property
-    def in_entities(self):
+    def _get_in_entities(self):
         ''' Is the Mention nested in a detected named entity'''
         return self.entity_label is not None
 
-    @property
-    def content_words(self):
-        ''' Returns an iterator of nouns/proper nouns in the Mention '''
-        return (tok.lower_ for tok in self if tok.tag_ in PROPERS_TAGS)
-
-    @property
-    def embedding(self):
-        return np.concatenate([self.spans_embeddings, self.words_embeddings], axis=0)
-
-    def find_type(self):
+    def _get_type(self):
         ''' Find the type of the Span '''
         conj = ["CC", ","]
         prp = ["PRP", "PRP$"]
@@ -261,12 +260,21 @@ class Mention(spacy.tokens.Span):
             mention_type = MENTION_TYPE["NOMINAL"]
         return mention_type
 
-    def _doc_sent_number(self):
+    def _get_doc_sent_number(self):
         ''' Index of the sentence of the Mention in the current utterance'''
         for i, s in enumerate(self.doc.sents):
             if s == self.sent:
                 return i
         return None
+
+    @property
+    def content_words(self):
+        ''' Returns an iterator of nouns/proper nouns in the Mention '''
+        return (tok.lower_ for tok in self if tok.tag_ in PROPERS_TAGS)
+
+    @property
+    def embedding(self):
+        return np.concatenate([self.spans_embeddings, self.words_embeddings], axis=0)
 
     def heads_agree(self, mention2):
         ''' Does the root of the Mention match the root of another Mention/Span'''
@@ -572,20 +580,13 @@ class Document(object):
             utterances_speaker = ((i + a + 1) % 2 for i in range(len(utterances)))
         utterances_index = []
         utt_start = len(self.utterances)
-        for utt_index, (utterance, speaker_id) in enumerate(zip_longest(utterances, utterances_speaker)):
-            if utterance is None:
-                break
-            # Pipe currently broken in spacy 2 alpha
-            # Also, spacy 2 currently throws an exception on empty strings
-            try:
-                doc = self.nlp(utterance)
-            except IndexError:
-                doc = self.nlp(u" ")
-                if self.debug: print("Empty string")
+        docs = list(self.nlp.pipe(utterances))
+        m_spans = list(extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list) for doc in docs)
+        for utt_index, (doc, m_spans, speaker_id) in enumerate(zip_longest(docs, m_spans, utterances_speaker)):
             if speaker_id not in self.speakers:
                 speaker_name = speakers_names.get(speaker_id, None) if speakers_names else None
                 self.speakers[speaker_id] = Speaker(speaker_id, speaker_name)
-            self._extract_mentions(doc, utt_start + utt_index, self.n_sents, self.speakers[speaker_id])
+            self._process_mentions(m_spans, utt_start + utt_index, self.n_sents, self.speakers[speaker_id])
             utterances_index.append(utt_start + utt_index)
             self.utterances.append(doc)
             self.utterances_speaker.append(self.speakers[speaker_id])
@@ -598,11 +599,10 @@ class Document(object):
     ## FEATURES MENTIONS EXTRACTION ###
     ###################################
 
-    def _extract_mentions(self, doc, utterance_index, n_sents, speaker):
+    def _process_mentions(self, mentions_spans, utterance_index, n_sents, speaker):
         '''
-        Extract mentions in a spacy doc (an utterance)
+        Process mentions in a spacy doc (an utterance)
         '''
-        mentions_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
         processed_spans = sorted((m for m in mentions_spans), key=lambda m: (m.root.i, m.start))
         n_mentions = len(self.mentions)
         for mention_index, span in enumerate(processed_spans):

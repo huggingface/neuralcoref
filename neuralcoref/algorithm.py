@@ -48,10 +48,11 @@ class Model(object):
 
     def _score(self, features, layers):
         for weights, bias in layers:
+            #print("features", features.shape)
             features = np.matmul(weights, features) + bias
             if weights.shape[0] > 1:
                 features = np.maximum(features, 0) # ReLU
-        return np.sum(features)
+        return np.sum(features, axis=0)
 
     def get_single_mention_score(self, mention, anaphoricity_features):
         first_layer_input = np.concatenate([mention.embedding,
@@ -62,6 +63,12 @@ class Model(object):
         first_layer_input = np.concatenate([antecedent.embedding,
                                             mention.embedding,
                                             pair_features], axis=0)[:, np.newaxis]
+        return self._score(first_layer_input, self.pair_mentions_model)
+
+    def get_multiple_single_score(self, first_layer_input):
+        return self._score(first_layer_input, self.single_mention_model)
+
+    def get_multiple_pair_score(self, first_layer_input):
         return self._score(first_layer_input, self.pair_mentions_model)
 
 
@@ -155,28 +162,47 @@ class Coref(object):
 
     def run_coref_on_mentions(self, mentions):
         '''
-        Run the coreference model on a mentions iterator or list
+        Run the coreference model on a mentions list
         '''
         best_ant = {}
+        best_score = {}
         n_ant = 0
-        for mention_idx, ant_list in self.data.get_candidate_pairs(mentions, self.max_dist, self.max_dist_match):
+        inp_l = []
+        for mention_idx in mentions:
             mention = self.data[mention_idx]
             feats_, ana_feats = self.data.get_single_mention_features(mention)
-            single_score = self.coref_model.get_single_mention_score(mention, ana_feats)
-            self.mentions_single_scores[mention_idx] = single_score
-            self.mentions_single_features[mention_idx] = {"spansEmbeddings": mention.spans_embeddings_, "wordsEmbeddings": mention.words_embeddings_, "features": feats_}
-            best_score = single_score - 50 * (self.greedyness - 0.5)
+            inp_l.append([mention.embedding, ana_feats])
+            self.mentions_single_features[mention_idx] = {"spansEmbeddings": mention.spans_embeddings_,
+                                                          "wordsEmbeddings": mention.words_embeddings_,
+                                                          "features": feats_}
+            # sc = self.coref_model.get_single_mention_score(mention, ana_feats)
+            # print("mention_idx", mention_idx, "sc", sc)
+
+        inp = np.block(inp_l)
+        score = self.coref_model.get_multiple_single_score(inp.T)
+        for mention_idx, s in zip(mentions, score):
+            self.mentions_single_scores[mention_idx] = s
+            best_score[mention_idx] = s - 50 * (self.greedyness - 0.5)
+
+        for mention_idx, ant_list in self.data.get_candidate_pairs(mentions, self.max_dist, self.max_dist_match):
+            if len(ant_list) == 0:
+                continue
+            inp_l = []
             for ant_idx in ant_list:
+                mention = self.data[mention_idx]
                 antecedent = self.data[ant_idx]
                 feats_, pwf = self.data.get_pair_mentions_features(antecedent, mention)
-                score = self.coref_model.get_pair_mentions_score(antecedent, mention, pwf)
-                self.mentions_pairs_scores[mention_idx][ant_idx] = score
+                inp_l.append([antecedent.embedding, mention.embedding, pwf])
                 self.mentions_pairs_features[mention_idx][ant_idx] = {"pairFeatures": feats_, "antecedentSpansEmbeddings": antecedent.spans_embeddings_,
                                                                       "antecedentWordsEmbeddings": antecedent.words_embeddings_,
                                                                       "mentionSpansEmbeddings": mention.spans_embeddings_,
                                                                       "mentionWordsEmbeddings": mention.words_embeddings_ }
-                if score > best_score:
-                    best_score = score
+            inp = np.block(inp_l)
+            score = self.coref_model.get_multiple_pair_score(inp.T)
+            for ant_idx, s in zip(ant_list, score):
+                self.mentions_pairs_scores[mention_idx][ant_idx] = s
+                if s > best_score[mention_idx]:
+                    best_score[mention_idx] = s
                     best_ant[mention_idx] = ant_idx
             if mention_idx in best_ant:
                 n_ant += 1
