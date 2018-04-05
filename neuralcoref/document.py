@@ -218,6 +218,10 @@ class Mention(spacy.tokens.Span):
         self.features_ = None
         self.spans_embeddings_ = None
         self.words_embeddings_ = None
+        
+    def __hash__(self):
+        ''' Return a hashed representation of self '''
+        return hash(repr(self))
 
     @property
     def propers(self):
