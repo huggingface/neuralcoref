@@ -151,16 +151,19 @@ cdef enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end, int test,
         print("right side after cleaning:", store[doc_c[maxchild_idx].lex.lower])
     return minchild_idx, maxchild_idx + 1
 
-cdef add_span(int start, int end, SentSpans mentions_spans, TokenC* doc_c, StringStore store, bint debug=True):
+cdef add_span(int start, int end, SentSpans* mentions_spans, TokenC* doc_c, StringStore store, bint debug=True):
     cdef int num = mentions_spans.num
     if debug:
         print("🔥 Add span: " + ' '.join(store[doc_c[i].lex.lower] for i in range(start, end)))
     mentions_spans.spans[num].start = start
     mentions_spans.spans[num].end = end
     mentions_spans.num += 1
+    if debug:
+        print("🔥 Add span: " + ' '.join(store[doc_c[i].lex.lower] for i in range(start, end)))
+        print("🔥 mentions_spans.num: ", mentions_spans.num)
     return mentions_spans.num >= mentions_spans.max_spans
 
-cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans mentions_spans,
+cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,
                         HashesList hashes, StringStore store, bint use_no_coref_list=True, bint debug=True):
     '''
     Extract Pronouns and Noun phrases mentions from a spacy Span
@@ -276,6 +279,12 @@ cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=True, bint debug=Tru
     '''
     Extract potential mentions from a spacy parsed Doc
     '''
+    cdef Pool mem = Pool()
+    cdef int i, max_spans
+    cdef int n_sents
+    cdef HashesList hashes
+    cdef SpanC spans_c
+
     if debug: print('===== doc ====:', doc)
     for c in doc:
         if debug: print("🚧 span search:", c, "head:", c.head, "tag:", c.tag_, "pos:", c.pos_, "dep:", c.dep_)
@@ -283,33 +292,32 @@ cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=True, bint debug=Tru
     mentions_spans = list(ent for ent in doc.ents if ent.label_ in ACCEPTED_ENTS)
 
     # Setup for fast scanning
-    cdef Pool mem = Pool()
-    cdef int n_sents = len(list(doc.sents))
+    n_sents = len(list(doc.sents))
     sent_spans = <SentSpans*>mem.alloc(n_sents, sizeof(SentSpans))
-    cdef int max_spans
     for i, sent in enumerate(doc.sents):
         max_spans = len(sent)*SPAN_FACTOR
         sent_spans[i].spans = <SpanC*>mem.alloc(max_spans, sizeof(SpanC))
         sent_spans[i].max_spans = max_spans
         sent_spans[i].num = 0
 
-    cdef HashesList hashes
     hashes = get_hash_lookups(doc.vocab.strings)
 
     if debug: print("==-- ents:", list(((ent, ent.label_) for ent in mentions_spans)))
     for i, sent in enumerate(doc.sents):
-        _extract_from_sent(doc.c, sent.start, sent.end, sent_spans[i], hashes, doc.vocab.strings)
+        _extract_from_sent(doc.c, sent.start, sent.end, &sent_spans[i], hashes, doc.vocab.strings)
     #for spans in parallel_process([{'span': sent,
     #                                'use_no_coref_list': use_no_coref_list} for sent in doc.sents],
     #                            _extract_from_sent, use_kwargs=True, n_jobs=4, front_num=0):
     #    mentions_spans = mentions_spans + spans
     spans_set = set()
     cleaned_mentions_spans = []
-    for spans in mentions_spans:
-        if spans.end > spans.start and (spans.start, spans.end) not in spans_set:
-            cleaned_mentions_spans.append(spans)
-            spans_set.add((spans.start, spans.end))
-
+    for i in range(n_sents):
+        for j in range(sent_spans[i].num):
+            spans_c = sent_spans[i].spans[j]
+            if spans_c.end > spans_c.start and (spans_c.start, spans_c.end) not in spans_set:
+                cleaned_mentions_spans.append(doc[spans_c.start:spans_c.end])
+                spans_set.add((spans_c.start, spans_c.end))
+    print("cleaned_mentions_spans", cleaned_mentions_spans)
     return cleaned_mentions_spans
 
 #########################
