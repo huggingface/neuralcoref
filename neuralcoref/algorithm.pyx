@@ -1,6 +1,7 @@
 # coding: utf8
 # cython: profile=True
 # cython: infer_types=True
+# distutils: language=c++
 """Coref resolution"""
 
 from __future__ import unicode_literals
@@ -8,22 +9,56 @@ from __future__ import print_function
 
 import sys
 import os
-import spacy
-import numpy as np
+from cpython cimport array
+import array
+from libc.stdint cimport uint16_t, uint32_t, uint64_t, uintptr_t, int32_t
 
-from neuralcoref.utils import PACKAGE_DIRECTORY, SIZE_PAIR_IN, SIZE_SINGLE_IN
+import spacy
+cimport numpy as np
+np.import_array()
+import numpy
+
+from neuralcoref.utils import (PACKAGE_DIRECTORY)
 from neuralcoref.compat import unicode_
 from neuralcoref.document import Document, MENTION_TYPE, NO_COREF_LIST
 
 #######################
 ##### UTILITIES #######
+DEF SIZE_SPAN = 250 # size of the span vector (averaged word embeddings)
+DEF SIZE_WORD = 8 # number of words in a mention (tuned embeddings)
+DEF SIZE_EMBEDDING = 50 # size of the words embeddings
+DEF SIZE_FP = 70 # number of features for a pair of mention
+DEF SIZE_FP_COMPRESSED = 9 # size of the features for a pair of mentions as stored in numpy arrays
+DEF SIZE_FS = 24 # number of features of a single mention
+DEF SIZE_FS_COMPRESSED = 6 # size of the features for a mention as stored in numpy arrays
+DEF SIZE_GENRE = 7 # Size of the genre one-hot array
+DEF SIZE_MENTION_EMBEDDING = SIZE_SPAN + SIZE_WORD * SIZE_EMBEDDING # A mention embeddings (span + words vectors)
+DEF SIZE_SNGL_FEATS = SIZE_FS - SIZE_GENRE
+DEF SIZE_PAIR_FEATS = SIZE_FP - SIZE_GENRE
+DEF SIZE_SNGL_IN_NO_GENRE = SIZE_MENTION_EMBEDDING + SIZE_SNGL_FEATS
+DEF SIZE_PAIR_IN_NO_GENRE = 2 * SIZE_MENTION_EMBEDDING + SIZE_PAIR_FEATS
+
+DEF SIZE_PAIR_IN = 2 * SIZE_MENTION_EMBEDDING + SIZE_FP # Input to the mentions pair neural network
+DEF SIZE_SINGLE_IN = SIZE_MENTION_EMBEDDING + SIZE_FS  # Input to the single mention neural network
+
+DISTANCE_BINS_PY = array.array('i', list(range(5)) + [5]*3 + [6]*8 + [7]*16 + [8]*32)
+cdef int[:] DISTANCE_BINS = DISTANCE_BINS_PY
+cdef float BINS_NUM = float(len(DISTANCE_BINS))
+cdef int MAX_BINS = DISTANCE_BINS[-1] + 1
 
 MAX_FOLLOW_UP = 50
+
+cdef index_distance(int d):
+    ''' Return index and value encoding to encode an integer as a (bined) one-hot array '''
+    cdef float float_val = min(float(d), BINS_NUM) / BINS_NUM
+    if d < 64:
+        return DISTANCE_BINS[d], float_val
+    return DISTANCE_BINS[-1] + 1, float_val
 
 #######################
 ###### CLASSES ########
 
-class Model(object):
+cdef class Model(object):
     '''
     Coreference neural model
     '''
@@ -31,46 +66,36 @@ class Model(object):
         weights, biases = [], []
         for file in sorted(os.listdir(model_path)):
             if file.startswith("single_mention_weights"):
-                w = np.load(os.path.join(model_path, file))
+                w = numpy.load(os.path.join(model_path, file)).astype(dtype='float32')
                 weights.append(w)
             if file.startswith("single_mention_bias"):
-                w = np.load(os.path.join(model_path, file))
+                w = numpy.load(os.path.join(model_path, file)).astype(dtype='float32')
                 biases.append(w)
         self.single_mention_model = list(zip(weights, biases))
         weights, biases = [], []
         for file in sorted(os.listdir(model_path)):
             if file.startswith("pair_mentions_weights"):
-                w = np.load(os.path.join(model_path, file))
+                w = numpy.load(os.path.join(model_path, file)).astype(dtype='float32')
                 weights.append(w)
             if file.startswith("pair_mentions_bias"):
-                w = np.load(os.path.join(model_path, file))
+                w = numpy.load(os.path.join(model_path, file)).astype(dtype='float32')
                 biases.append(w)
         self.pair_mentions_model = list(zip(weights, biases))
+        self.n_layers = len(self.pair_mentions_model)
 
-    def _score(self, features, layers):
+    cdef _score(self, float[:,:] features, bint single):
+        layers = self.single_mention_model if single else self.pair_mentions_model
         for weights, bias in layers:
-            #print("features", features.shape)
-            features = np.matmul(weights, features) + bias
+            features = numpy.matmul(weights, features) + bias
             if weights.shape[0] > 1:
-                features = np.maximum(features, 0) # ReLU
-        return np.sum(features, axis=0)
+                features = numpy.maximum(features, 0) # ReLU
+        return numpy.sum(features, axis=0)
 
-    def get_single_mention_score(self, mention, anaphoricity_features):
-        first_layer_input = np.concatenate([mention.embedding,
-                                            anaphoricity_features], axis=0)[:, np.newaxis]
-        return self._score(first_layer_input, self.single_mention_model)
+    def get_multiple_single_score(self, float[:,:] first_layer_input):
+        return self._score(first_layer_input, True)
 
-    def get_pair_mentions_score(self, antecedent, mention, pair_features):
-        first_layer_input = np.concatenate([antecedent.embedding,
-                                            mention.embedding,
-                                            pair_features], axis=0)[:, np.newaxis]
-        return self._score(first_layer_input, self.pair_mentions_model)
-
-    def get_multiple_single_score(self, first_layer_input):
-        return self._score(first_layer_input, self.single_mention_model)
-
-    def get_multiple_pair_score(self, first_layer_input):
-        return self._score(first_layer_input, self.pair_mentions_model)
+    def get_multiple_pair_score(self, float[:,:] first_layer_input):
+        return self._score(first_layer_input, False)
 
 
 class Coref(object):
@@ -155,123 +180,142 @@ class Coref(object):
     ####### MAIN COREF FUNCTIONS ######
     ###################################
 
-    def run_coref_on_mentions(self, mentions):
+    def run_coref_on_utterances(self):
         '''
         Run the coreference model on a mentions list
         '''
-        best_ant = {}
-        best_score = {}
-        n_ant = 0
-        inp = np.empty((SIZE_SINGLE_IN, len(mentions)))
-        for i, mention_idx in enumerate(mentions):
-            mention = self.data[mention_idx]
-            print("mention.embedding", mention.embedding.shape)
-            inp[:len(mention.embedding), i] = mention.embedding
-            inp[:len(mention.embedding), i] = mention.features
-            inp[:len(mention.embedding), i] = self.data.genre
-        score = self.coref_model.get_multiple_single_score(inp.T)
-        for mention_idx, s in zip(mentions, score):
-            self.mentions_single_scores[mention_idx] = s
-            best_score[mention_idx] = s - 50 * (self.greedyness - 0.5)
+        self._prepare_clusters()
 
-        for mention_idx, ant_list in self.data.get_candidate_pairs(mentions, self.max_dist, self.max_dist_match):
-            if len(ant_list) == 0:
-                continue
-            inp_l = []
-            for ant_idx in ant_list:
-                mention = self.data[mention_idx]
-                antecedent = self.data[ant_idx]
-                feats_, pwf = self.data.get_pair_mentions_features(antecedent, mention)
-                inp_l.append(pwf)
-            inp = np.stack(inp_l, axis=0)
-            score = self.coref_model.get_multiple_pair_score(inp.T)
-            for ant_idx, s in zip(ant_list, score):
-                self.mentions_pairs_scores[mention_idx][ant_idx] = s
-                if s > best_score[mention_idx]:
-                    best_score[mention_idx] = s
-                    best_ant[mention_idx] = ant_idx
-            if mention_idx in best_ant:
+        cdef int i, j1, j2, b_idx
+        cdef float val
+        cdef int n_ant = 0
+        cdef np.ndarray genre = self.data.genre
+        cdef int SZ_GENRE = genre.shape[0]
+        cdef np.ndarray[uint64_t, ndim=1] p_ant = self.data.pairs_ant
+        cdef np.ndarray[uint64_t, ndim=1] p_men = self.data.pairs_men
+        cdef int ant_idx
+        cdef int men_idx
+        cdef float [:] score, embed, feats, embed2, feats2
+        cdef int n_mentions = self.data.n_mentions
+        cdef int n_pairs = self.data.n_pairs
+        inp_ar = numpy.empty((SIZE_SNGL_IN_NO_GENRE + SZ_GENRE, n_mentions), dtype='float32')
+        cdef float [:, :] inp = inp_ar
+        best_score_ar = numpy.empty((n_mentions), dtype='float32')
+        cdef float [:] best_score = best_score_ar
+        inp2_ar = numpy.empty((SIZE_PAIR_IN_NO_GENRE + SZ_GENRE, n_pairs), dtype='float32')
+        cdef float [:, :] inp2 = inp2_ar
+        best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
+        cdef uint64_t [:] best_ant = best_ant_ar
+        for i in range(n_mentions):
+            mention = self.data.mentions[i]
+            embed = mention.embeddings
+            feats = mention.features
+            inp[:SIZE_MENTION_EMBEDDING, i] = embed
+            inp[SIZE_MENTION_EMBEDDING:SIZE_MENTION_EMBEDDING+SIZE_SNGL_FEATS, i] = feats
+            inp[SIZE_MENTION_EMBEDDING+SIZE_SNGL_FEATS:, i] = self.data.genre
+        score = self.coref_model.get_multiple_single_score(inp)
+        for i in range(n_mentions):
+            best_score[i] = score[i] - 50 * (self.greedyness - 0.5)
+            best_ant[i] = i
+
+        for i in range(n_pairs):
+            ant_idx = p_ant[i]
+            men_idx = p_men[i]
+            m1 = self.data.mentions[ant_idx]
+            embed = m1.embeddings
+            feats = m1.features
+            m2 = self.data.mentions[men_idx]
+            embed2 = m2.embeddings
+            feats2 = m2.features
+            j1 = SIZE_MENTION_EMBEDDING
+            inp2[:j1, i] = embed
+            j2 = j1 + SIZE_MENTION_EMBEDDING
+            inp2[j1:j2, i] = embed2
+            j1 = j2
+            inp2[j1, i] = 1
+            j1 += 1
+            inp2[j1, i] = 0
+            j1 += 1
+            inp2[j1, i] = 0
+            j1 += 1
+            inp2[j1, i] = m1.heads_agree(m2)
+            j1 += 1
+            inp2[j1, i] = m1.exact_match(m2)
+            j1 += 1
+            inp2[j1, i] = m1.relaxed_match(m2)
+            j1 += 1
+            b_idx, val = index_distance(m2.utterances_sent - m1.utterances_sent)
+            inp2[j1:j1 + MAX_BINS + 1, i] = 0
+            inp2[j1 + b_idx, i] = 1
+            j1 += MAX_BINS + 1;
+            inp2[j1, i] = val
+            j1 += 1
+            b_idx, val = index_distance(m2.index - m1.index - 1)
+            inp2[j1:j1 + MAX_BINS + 1, i] = 0
+            inp2[j1+b_idx, i] = 1
+            j1 += MAX_BINS + 1;
+            inp2[j1, i] = val
+            j1 += 1
+            inp2[j1, i] = m1.overlapping(m2)
+            j1 += 1
+            j2 = j1 + SIZE_SNGL_FEATS
+            inp2[j1:j2, i] = feats
+            j1 = j2
+            j2 = j1 + SIZE_SNGL_FEATS
+            inp2[j1:j2, i] = feats2
+            j1 = j2
+            inp2[j1:, i] = self.data.genre
+        score = self.coref_model.get_multiple_pair_score(inp2)
+        for i in range(n_pairs):
+            ant_idx = p_ant[i]
+            men_idx = p_men[i]
+            if score[i] > best_score[men_idx]:
+                best_score[men_idx] = score[i]
+                best_ant[men_idx] = ant_idx
+        for i in range(n_mentions):
+            if best_ant[i] != i:
                 n_ant += 1
-                self._merge_coreference_clusters(best_ant[mention_idx], mention_idx)
+                self._merge_coreference_clusters(best_ant[i], i)
         return (n_ant, best_ant)
 
-    def run_coref_on_utterances(self, last_utterances_added=False, follow_chains=True, debug=False):
-        ''' Run the coreference model on some utterances
-
-        Arg:
-            last_utterances_added: run the coreference model over the last utterances added to the data
-            follow_chains: follow coreference chains over previous utterances
-        '''
-        if debug: print("== run_coref_on_utterances == start")
-        self._prepare_clusters()
-        if debug: self.display_clusters()
-        mentions = list(self.data.get_candidate_mentions(last_utterances_added=last_utterances_added))
-        n_ant, antecedents = self.run_coref_on_mentions(mentions)
-        mentions = antecedents.values()
-        if follow_chains and last_utterances_added and n_ant > 0:
-            i = 0
-            while i < MAX_FOLLOW_UP:
-                i += 1
-                n_ant, antecedents = self.run_coref_on_mentions(mentions)
-                mentions = antecedents.values()
-                if n_ant == 0:
-                    break
-        if debug: self.display_clusters()
-        if debug: print("== run_coref_on_utterances == end")
-
-    def one_shot_coref(self, utterances, utterances_speakers_id=None, context=None,
-                       context_speakers_id=None, speakers_names=None):
-        ''' Clear history, load a list of utterances and an optional context and run the coreference model on them
+    def one_shot_coref(self, utterances):
+        ''' Clear history, load a list of utterances and run the coreference model on them
 
         Arg:
         - `utterances` : iterator or list of string corresponding to successive utterances (in a dialogue) or sentences.
             Can be a single string for non-dialogue text.
-        - `utterances_speakers_id=None` : iterator or list of speaker id for each utterance (in the case of a dialogue).
-            - if not provided, assume two speakers speaking alternatively.
-            - if utterances and utterances_speaker are not of the same length padded with None
-        - `context=None` : iterator or list of string corresponding to additionnal utterances/sentences sent prior to `utterances`. Coreferences are not computed for the mentions identified in `context`. The mentions in `context` are only used as possible antecedents to mentions in `uterrance`. Reduce the computations when we are only interested in resolving coreference in the last sentences/utterances.
-        - `context_speakers_id=None` : same as `utterances_speakers_id` for `context`. 
-        - `speakers_names=None` : dictionnary of list of acceptable speaker names (strings) for speaker_id in `utterances_speakers_id` and `context_speakers_id`
         Return:
             clusters of entities with coreference resolved
         '''
-        self.data.set_utterances(context, context_speakers_id, speakers_names)
-        self.continuous_coref(utterances, utterances_speakers_id, speakers_names)
+        self.continuous_coref(utterances)
         return self.get_clusters()
 
-    def continuous_coref(self, utterances, utterances_speakers_id=None, speakers_names=None):
+    def continuous_coref(self, utterances):
         '''
         Only resolve coreferences for the mentions in the utterances
         (but use the mentions in previously loaded utterances as possible antecedents)
         Arg:
             utterances : iterator or list of string corresponding to successive utterances
-            utterances_speaker : iterator or list of speaker id for each utterance.
-                If not provided, assume two speakers speaking alternatively.
-                if utterances and utterances_speaker are not of the same length padded with None
-            speakers_names : dictionnary of list of acceptable speaker names for each speaker id
         Return:
             clusters of entities with coreference resolved
         '''
-        self.data.add_utterances(utterances, utterances_speakers_id, speakers_names)
-        self.run_coref_on_utterances(last_utterances_added=True, follow_chains=True)
+        self.data.add_utterances(utterances)
+        self.run_coref_on_utterances()
         return self.get_clusters()
 
     ###################################
     ###### INFORMATION RETRIEVAL ######
     ###################################
 
-    def get_utterances(self, last_utterances_added=True):
+    def get_utterances(self):
         ''' Retrieve the list of parsed uterrances'''
-        if last_utterances_added and len(self.data.last_utterances_loaded):
-            return [self.data.utterances[idx] for idx in self.data.last_utterances_loaded]
-        else:
-            return self.data.utterances
+        return self.data.utterances
 
-    def get_resolved_utterances(self, last_utterances_added=True, use_no_coref_list=True):
-        ''' Return a list of utterrances text where the '''
-        coreferences = self.get_most_representative(last_utterances_added, use_no_coref_list)
+    def get_resolved_utterances(self, use_no_coref_list=True):
+        ''' Return a list of utterrances text where the coref are resolved to the most representative mention'''
+        coreferences = self.get_most_representative(use_no_coref_list)
         resolved_utterances = []
-        for utt in self.get_utterances(last_utterances_added=last_utterances_added):
+        for utt in self.get_utterances():
             resolved_utt = ""
             in_coref = None
             for token in utt:
@@ -279,7 +323,7 @@ class Coref(object):
                     for coref_original, coref_replace in coreferences.items():
                         if coref_original[0] == token:
                             in_coref = coref_original
-                            resolved_utt += coref_replace.text.lower()
+                            resolved_utt += coref_replace.span.lower_
                             break
                     if in_coref is None:
                         resolved_utt += token.text_with_ws
@@ -308,13 +352,13 @@ class Coref(object):
                 cleaned_list = []
                 for mention_idx in mentions:
                     mention = self.data.mentions[mention_idx]
-                    if mention.lower_ not in NO_COREF_LIST:
+                    if mention.span.lower_ not in NO_COREF_LIST:
                         cleaned_list.append(mention_idx)
                 clusters[key] = cleaned_list
             # Also clean up keys so we can build coref chains in self.get_most_representative
             added = {}
             for key, mentions in clusters.items():
-                if self.data.mentions[key].lower_ in NO_COREF_LIST:
+                if self.data.mentions[key].span.lower_ in NO_COREF_LIST:
                     remove_id.append(key)
                     mention_to_cluster[key] = None
                     if mentions:
@@ -334,7 +378,7 @@ class Coref(object):
 
         return clusters, mention_to_cluster
 
-    def get_most_representative(self, last_utterances_added=True, use_no_coref_list=True):
+    def get_most_representative(self, use_no_coref_list=True):
         '''
         Find a most representative mention for each cluster
 
@@ -343,7 +387,8 @@ class Coref(object):
         '''
         clusters, _ = self.get_clusters(remove_singletons=True, use_no_coref_list=use_no_coref_list)
         coreferences = {}
-        for key in self.data.get_candidate_mentions(last_utterances_added=last_utterances_added):
+        cdef int key
+        for key in range(self.data.n_mentions):
             if self.mention_to_cluster[key] is None:
                 continue
             mentions = clusters.get(self.mention_to_cluster[key], None)
