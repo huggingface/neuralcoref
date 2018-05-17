@@ -630,7 +630,8 @@ class Document(object):
                                        np.array(features_["03_MentionNormLocation"], ndmin=1, copy=False),
                                        np.array(features_["04_IsMentionNested"], ndmin=1, copy=False)
                                       ], axis=0)
-            spans_embeddings_, words_embeddings_, spans_embeddings, words_embeddings = self.embed_extractor.get_mention_embeddings(mention, doc_embedding)
+            (spans_embeddings_, words_embeddings_,
+             spans_embeddings, words_embeddings) = self.embed_extractor.get_mention_embeddings(mention, doc_embedding)
             mention.features_ = features_
             mention.features = features
             mention.spans_embeddings = spans_embeddings
