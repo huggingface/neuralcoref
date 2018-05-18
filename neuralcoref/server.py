@@ -21,7 +21,7 @@ class CorefWrapper(Coref):
 
     def run_coref(self):
         self.run_coref_on_utterances(last_utterances_added=True, follow_chains=True)
-        coreferences = self.get_most_representative(use_no_coref_list=False)
+        coreferences = self.get_most_representative(blacklist=False)
 
         json_mentions = [{'index':          mention.index,
                           'start':          mention.start_char,

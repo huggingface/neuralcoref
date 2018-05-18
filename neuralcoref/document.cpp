@@ -2485,25 +2485,25 @@ struct __pyx_opt_args_11neuralcoref_8document_add_span {
  *     return mentions_spans.num >= mentions_spans.max_spans
  * 
  * cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,             # <<<<<<<<<<<<<<
- *                         HashesList hashes, StringStore store, bint use_no_coref_list=False,
+ *                         HashesList hashes, StringStore store, bint blacklist=False,
  *                         bint debug=False):
  */
 struct __pyx_opt_args_11neuralcoref_8document__extract_from_sent {
   int __pyx_n;
-  int use_no_coref_list;
+  int blacklist;
   int debug;
 };
 
 /* "neuralcoref/document.pyx":296
  *     return
  * 
- * cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=False, bint debug=False):             # <<<<<<<<<<<<<<
+ * cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=False):             # <<<<<<<<<<<<<<
  *     '''
  *     Extract potential mentions from a spacy parsed Doc
  */
 struct __pyx_opt_args_11neuralcoref_8document_extract_mentions_spans {
   int __pyx_n;
-  int use_no_coref_list;
+  int blacklist;
   int debug;
 };
 
@@ -2765,7 +2765,7 @@ struct __pyx_obj_11neuralcoref_8document_Document {
   struct __pyx_t_11neuralcoref_8document_Mention_C *c;
   struct __pyx_obj_5cymem_5cymem_Pool *mem;
   PyObject *nlp;
-  int use_no_coref_list;
+  int blacklist;
   int debug;
   PyObject *utterances;
   PyObject *mentions;
@@ -2827,7 +2827,7 @@ struct __pyx_obj_11neuralcoref_8document___pyx_scope_struct_2_genexpr {
 /* "neuralcoref/document.pyx":296
  *     return
  * 
- * cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=False, bint debug=False):             # <<<<<<<<<<<<<<
+ * cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=False):             # <<<<<<<<<<<<<<
  *     '''
  *     Extract potential mentions from a spacy parsed Doc
  */
@@ -2997,7 +2997,7 @@ struct __pyx_obj_11neuralcoref_8document___pyx_scope_struct_14_add_utterances {
 
 /* "neuralcoref/document.pyx":688
  *         for utt_idx, doc in enumerate(docs):
- *             m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
+ *             m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)
  *             mentions += list(Mention(span, utt_idx, self.n_sents) for span in m_span)             # <<<<<<<<<<<<<<
  *             self.n_mentions += n_spans
  *             self.utterances.append(doc)
@@ -5005,6 +5005,7 @@ static const char __pyx_k_word_idx[] = "word_idx";
 static const char __pyx_k_KEEP_TAGS[] = "KEEP_TAGS";
 static const char __pyx_k_LEAVE_DEP[] = "LEAVE_DEP";
 static const char __pyx_k_TypeError[] = "TypeError";
+static const char __pyx_k_blacklist[] = "blacklist";
 static const char __pyx_k_enumerate[] = "enumerate";
 static const char __pyx_k_itertools[] = "itertools";
 static const char __pyx_k_metaclass[] = "__metaclass__";
@@ -5025,6 +5026,7 @@ static const char __pyx_k_features_2[] = "features";
 static const char __pyx_k_idx_to_voc[] = "idx_to_voc";
 static const char __pyx_k_isdisjoint[] = "isdisjoint";
 static const char __pyx_k_max_length[] = "max_length";
+static const char __pyx_k_model_path[] = "model_path";
 static const char __pyx_k_pyx_result[] = "__pyx_result";
 static const char __pyx_k_pyx_vtable[] = "__pyx_vtable__";
 static const char __pyx_k_s_detected[] = "'s detected";
@@ -5116,7 +5118,6 @@ static const char __pyx_k_minchild_c_c_head[] = "minchild c & c.head:";
 static const char __pyx_k_neuralcoref_utils[] = "neuralcoref.utils";
 static const char __pyx_k_pyx_unpickle_Enum[] = "__pyx_unpickle_Enum";
 static const char __pyx_k_static_embeddings[] = "static_embeddings";
-static const char __pyx_k_use_no_coref_list[] = "use_no_coref_list";
 static const char __pyx_k_02_MentionLastWord[] = "02_MentionLastWord";
 static const char __pyx_k_04_IsMentionNested[] = "04_IsMentionNested";
 static const char __pyx_k_07_MentionDistance[] = "07_MentionDistance";
@@ -5127,7 +5128,6 @@ static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
 static const char __pyx_k_get_word_embedding[] = "get_word_embedding";
 static const char __pyx_k_neuralcoref_compat[] = "neuralcoref.compat";
 static const char __pyx_k_strided_and_direct[] = "<strided and direct>";
-static const char __pyx_k_trained_embed_path[] = "trained_embed_path";
 static const char __pyx_k_utt_start_sent_idx[] = "utt_start_sent_idx";
 static const char __pyx_k_01_MentionFirstWord[] = "01_MentionFirstWord";
 static const char __pyx_k_04_ExactStringMatch[] = "04_ExactStringMatch";
@@ -5396,6 +5396,7 @@ static PyObject *__pyx_n_s_average;
 static PyObject *__pyx_n_s_average_mean;
 static PyObject *__pyx_n_s_axis;
 static PyObject *__pyx_n_s_base;
+static PyObject *__pyx_n_s_blacklist;
 static PyObject *__pyx_n_s_c;
 static PyObject *__pyx_n_u_c;
 static PyObject *__pyx_n_s_cinit___locals_genexpr;
@@ -5514,6 +5515,7 @@ static PyObject *__pyx_n_s_metaclass;
 static PyObject *__pyx_kp_u_minchild_c_c_head;
 static PyObject *__pyx_kp_u_missing;
 static PyObject *__pyx_n_s_mode;
+static PyObject *__pyx_n_s_model_path;
 static PyObject *__pyx_n_s_module;
 static PyObject *__pyx_n_s_ms;
 static PyObject *__pyx_n_s_ms_lefts;
@@ -5632,7 +5634,6 @@ static PyObject *__pyx_kp_u_tok_tag;
 static PyObject *__pyx_kp_u_token_head;
 static PyObject *__pyx_kp_u_token_in_no_coref_list;
 static PyObject *__pyx_n_s_token_list;
-static PyObject *__pyx_n_s_trained_embed_path;
 static PyObject *__pyx_n_s_tun_idx;
 static PyObject *__pyx_n_s_tun_voc;
 static PyObject *__pyx_n_s_tuned_embeddings;
@@ -5644,7 +5645,6 @@ static PyObject *__pyx_n_s_unicode;
 static PyObject *__pyx_kp_u_unknown_dtype_code_in_numpy_pxd;
 static PyObject *__pyx_n_s_unpack;
 static PyObject *__pyx_n_s_update;
-static PyObject *__pyx_n_s_use_no_coref_list;
 static PyObject *__pyx_kp_u_utf_8;
 static PyObject *__pyx_n_s_utt;
 static PyObject *__pyx_n_s_utt_embed;
@@ -5717,8 +5717,8 @@ static PyObject *__pyx_pf_11neuralcoref_8document_18EmbeddingExtractor_10get_wor
 static PyObject *__pyx_pf_11neuralcoref_8document_18EmbeddingExtractor_12get_word_in_sentence(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_self, PyObject *__pyx_v_word_idx, PyObject *__pyx_v_sentence); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_18EmbeddingExtractor_14get_average_embedding(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_self, PyObject *__pyx_v_token_list); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_18EmbeddingExtractor_16get_mention_embeddings(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_self, PyObject *__pyx_v_mention, PyObject *__pyx_v_doc_embedding); /* proto */
-static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v_nlp, CYTHON_UNUSED PyObject *__pyx_v_utterances, int __pyx_v_use_no_coref_list, CYTHON_UNUSED PyObject *__pyx_v_trained_embed_path, CYTHON_UNUSED PyObject *__pyx_v_embedding_extractor, CYTHON_UNUSED PyObject *__pyx_v_conll, int __pyx_v_debug); /* proto */
-static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, PyObject *__pyx_v_nlp, PyObject *__pyx_v_utterances, PyObject *__pyx_v_use_no_coref_list, PyObject *__pyx_v_trained_embed_path, PyObject *__pyx_v_embedding_extractor, PyObject *__pyx_v_conll, PyObject *__pyx_v_debug); /* proto */
+static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v_nlp, CYTHON_UNUSED PyObject *__pyx_v_utterances, int __pyx_v_blacklist, CYTHON_UNUSED PyObject *__pyx_v_model_path, CYTHON_UNUSED PyObject *__pyx_v_embedding_extractor, CYTHON_UNUSED PyObject *__pyx_v_conll, int __pyx_v_debug); /* proto */
+static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, PyObject *__pyx_v_nlp, PyObject *__pyx_v_utterances, PyObject *__pyx_v_blacklist, PyObject *__pyx_v_model_path, PyObject *__pyx_v_embedding_extractor, PyObject *__pyx_v_conll, PyObject *__pyx_v_debug); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_4set_genre(CYTHON_UNUSED struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, PyObject *__pyx_v_conll); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_7__str___genexpr(PyObject *__pyx_self); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_7__str___3genexpr(PyObject *__pyx_self); /* proto */
@@ -5737,7 +5737,7 @@ static PyObject *__pyx_pf_11neuralcoref_8document_8Document_21get_raw_pair_featu
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_23get_pair_mentions_features(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, PyObject *__pyx_v_m1, PyObject *__pyx_v_m2); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_3mem___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_3nlp___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self); /* proto */
-static PyObject *__pyx_pf_11neuralcoref_8document_8Document_17use_no_coref_list___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_11neuralcoref_8document_8Document_9blacklist___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_5debug___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_10utterances___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11neuralcoref_8document_8Document_8mentions___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self); /* proto */
@@ -8821,7 +8821,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_add_span(int __pyx_v_start, int
  *     return mentions_spans.num >= mentions_spans.max_spans
  * 
  * cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,             # <<<<<<<<<<<<<<
- *                         HashesList hashes, StringStore store, bint use_no_coref_list=False,
+ *                         HashesList hashes, StringStore store, bint blacklist=False,
  *                         bint debug=False):
  */
 
@@ -8830,15 +8830,15 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
   /* "neuralcoref/document.pyx":185
  * 
  * cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,
- *                         HashesList hashes, StringStore store, bint use_no_coref_list=False,             # <<<<<<<<<<<<<<
+ *                         HashesList hashes, StringStore store, bint blacklist=False,             # <<<<<<<<<<<<<<
  *                         bint debug=False):
  *     '''
  */
-  int __pyx_v_use_no_coref_list = ((int)0);
+  int __pyx_v_blacklist = ((int)0);
 
   /* "neuralcoref/document.pyx":186
  * cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,
- *                         HashesList hashes, StringStore store, bint use_no_coref_list=False,
+ *                         HashesList hashes, StringStore store, bint blacklist=False,
  *                         bint debug=False):             # <<<<<<<<<<<<<<
  *     '''
  *     Extract Pronouns and Noun phrases mentions from a spacy Span
@@ -8879,7 +8879,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
   __Pyx_TraceCall("_extract_from_sent", __pyx_f[0], 184, 0, __PYX_ERR(0, 184, __pyx_L1_error));
   if (__pyx_optional_args) {
     if (__pyx_optional_args->__pyx_n > 0) {
-      __pyx_v_use_no_coref_list = __pyx_optional_args->use_no_coref_list;
+      __pyx_v_blacklist = __pyx_optional_args->blacklist;
       if (__pyx_optional_args->__pyx_n > 1) {
         __pyx_v_debug = __pyx_optional_args->debug;
       }
@@ -8967,7 +8967,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
  *         token = doc_c[i]
  *         if debug: print(" tok:", store[token.lex.lower], "tok.tag:", store[token.tag],             # <<<<<<<<<<<<<<
  *                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
  */
     __pyx_t_1 = (__pyx_v_debug != 0);
     if (__pyx_t_1) {
@@ -8980,7 +8980,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
  *         token = doc_c[i]
  *         if debug: print(" tok:", store[token.lex.lower], "tok.tag:", store[token.tag],
  *                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])             # <<<<<<<<<<<<<<
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
  *             if debug: print("token in no_coref_list")
  */
       __pyx_t_2 = __Pyx_PyInt_From_enum____pyx_t_5spacy_15parts_of_speech_univ_pos_t(__pyx_v_token.pos); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 199, __pyx_L1_error)
@@ -8996,7 +8996,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
  *         token = doc_c[i]
  *         if debug: print(" tok:", store[token.lex.lower], "tok.tag:", store[token.tag],             # <<<<<<<<<<<<<<
  *                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
  */
       __pyx_t_10 = PyTuple_New(8); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 198, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_10);
@@ -9033,11 +9033,11 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
     /* "neuralcoref/document.pyx":200
  *         if debug: print(" tok:", store[token.lex.lower], "tok.tag:", store[token.tag],
  *                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):             # <<<<<<<<<<<<<<
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):             # <<<<<<<<<<<<<<
  *             if debug: print("token in no_coref_list")
  *             continue
  */
-    __pyx_t_11 = (__pyx_v_use_no_coref_list != 0);
+    __pyx_t_11 = (__pyx_v_blacklist != 0);
     if (__pyx_t_11) {
     } else {
       __pyx_t_1 = __pyx_t_11;
@@ -9050,7 +9050,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
 
       /* "neuralcoref/document.pyx":201
  *                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
  *             if debug: print("token in no_coref_list")             # <<<<<<<<<<<<<<
  *             continue
  *         if (not inside(token.tag, hashes.keep_tags) or inside(token.dep, hashes.leave_dep) \
@@ -9063,7 +9063,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
       }
 
       /* "neuralcoref/document.pyx":202
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
  *             if debug: print("token in no_coref_list")
  *             continue             # <<<<<<<<<<<<<<
  *         if (not inside(token.tag, hashes.keep_tags) or inside(token.dep, hashes.leave_dep) \
@@ -9074,7 +9074,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
       /* "neuralcoref/document.pyx":200
  *         if debug: print(" tok:", store[token.lex.lower], "tok.tag:", store[token.tag],
  *                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):             # <<<<<<<<<<<<<<
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):             # <<<<<<<<<<<<<<
  *             if debug: print("token in no_coref_list")
  *             continue
  */
@@ -10253,7 +10253,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
  *     #if debug: print("mentions_spans inside", mentions_spans)
  *     return             # <<<<<<<<<<<<<<
  * 
- * cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=False, bint debug=False):
+ * cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=False):
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_r = Py_None; __Pyx_INCREF(Py_None);
@@ -10263,7 +10263,7 @@ static PyObject *__pyx_f_11neuralcoref_8document__extract_from_sent(struct __pyx
  *     return mentions_spans.num >= mentions_spans.max_spans
  * 
  * cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,             # <<<<<<<<<<<<<<
- *                         HashesList hashes, StringStore store, bint use_no_coref_list=False,
+ *                         HashesList hashes, StringStore store, bint blacklist=False,
  *                         bint debug=False):
  */
 
@@ -10553,14 +10553,14 @@ static PyObject *__pyx_gb_11neuralcoref_8document_22extract_mentions_spans_5gene
 /* "neuralcoref/document.pyx":296
  *     return
  * 
- * cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=False, bint debug=False):             # <<<<<<<<<<<<<<
+ * cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=False):             # <<<<<<<<<<<<<<
  *     '''
  *     Extract potential mentions from a spacy parsed Doc
  */
 
 static PyObject *__pyx_f_11neuralcoref_8document_extract_mentions_spans(struct __pyx_obj_5spacy_6tokens_3doc_Doc *__pyx_v_doc, struct __pyx_opt_args_11neuralcoref_8document_extract_mentions_spans *__pyx_optional_args) {
   struct __pyx_obj_11neuralcoref_8document___pyx_scope_struct_3___pyx_f_11neuralcoref_8document_extract_mentions_spans *__pyx_cur_scope;
-  int __pyx_v_use_no_coref_list = ((int)0);
+  int __pyx_v_blacklist = ((int)0);
   int __pyx_v_debug = ((int)0);
   int __pyx_v_i;
   int __pyx_v_max_spans;
@@ -10614,7 +10614,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_extract_mentions_spans(struct _
   __Pyx_TraceCall("extract_mentions_spans", __pyx_f[0], 296, 0, __PYX_ERR(0, 296, __pyx_L1_error));
   if (__pyx_optional_args) {
     if (__pyx_optional_args->__pyx_n > 0) {
-      __pyx_v_use_no_coref_list = __pyx_optional_args->use_no_coref_list;
+      __pyx_v_blacklist = __pyx_optional_args->blacklist;
       if (__pyx_optional_args->__pyx_n > 1) {
         __pyx_v_debug = __pyx_optional_args->debug;
       }
@@ -11027,7 +11027,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_extract_mentions_spans(struct _
  *     for i, sent in enumerate(doc.sents):
  *         _extract_from_sent(doc.c, sent.start, sent.end, &sent_spans[i],             # <<<<<<<<<<<<<<
  *                            hashes, doc.vocab.strings,
- *                            use_no_coref_list=use_no_coref_list)
+ *                            blacklist=blacklist)
  */
     __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_sent, __pyx_n_s_start); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 327, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
@@ -11042,7 +11042,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_extract_mentions_spans(struct _
  *     for i, sent in enumerate(doc.sents):
  *         _extract_from_sent(doc.c, sent.start, sent.end, &sent_spans[i],
  *                            hashes, doc.vocab.strings,             # <<<<<<<<<<<<<<
- *                            use_no_coref_list=use_no_coref_list)
+ *                            blacklist=blacklist)
  *     #for spans in parallel_process([{'span': sent,
  */
     __pyx_t_3 = ((PyObject *)__pyx_cur_scope->__pyx_v_doc->vocab->strings);
@@ -11053,10 +11053,10 @@ static PyObject *__pyx_f_11neuralcoref_8document_extract_mentions_spans(struct _
  *     for i, sent in enumerate(doc.sents):
  *         _extract_from_sent(doc.c, sent.start, sent.end, &sent_spans[i],             # <<<<<<<<<<<<<<
  *                            hashes, doc.vocab.strings,
- *                            use_no_coref_list=use_no_coref_list)
+ *                            blacklist=blacklist)
  */
     __pyx_t_15.__pyx_n = 1;
-    __pyx_t_15.use_no_coref_list = __pyx_v_use_no_coref_list;
+    __pyx_t_15.blacklist = __pyx_v_blacklist;
     __pyx_t_9 = __pyx_f_11neuralcoref_8document__extract_from_sent(__pyx_cur_scope->__pyx_v_doc->c, __pyx_t_13, __pyx_t_14, (&(__pyx_v_sent_spans[__pyx_v_i])), __pyx_v_hashes, ((struct __pyx_obj_5spacy_7strings_StringStore *)__pyx_t_3), &__pyx_t_15); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 327, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_9);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
@@ -11406,7 +11406,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_extract_mentions_spans(struct _
   /* "neuralcoref/document.pyx":296
  *     return
  * 
- * cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=False, bint debug=False):             # <<<<<<<<<<<<<<
+ * cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=False):             # <<<<<<<<<<<<<<
  *     '''
  *     Extract potential mentions from a spacy parsed Doc
  */
@@ -19200,8 +19200,8 @@ static PyObject *__pyx_pf_11neuralcoref_8document_18EmbeddingExtractor_16get_men
  *     Process utterances to extract mentions and pre-compute mentions features
  *     '''
  *     def __cinit__(self, nlp, utterances=None,             # <<<<<<<<<<<<<<
- *                   bint use_no_coref_list=False,
- *                   trained_embed_path=None, embedding_extractor=None,
+ *                   bint blacklist=False,
+ *                   model_path=None, embedding_extractor=None,
  */
 
 /* Python wrapper */
@@ -19209,8 +19209,8 @@ static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx
 static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   CYTHON_UNUSED PyObject *__pyx_v_nlp = 0;
   CYTHON_UNUSED PyObject *__pyx_v_utterances = 0;
-  int __pyx_v_use_no_coref_list;
-  CYTHON_UNUSED PyObject *__pyx_v_trained_embed_path = 0;
+  int __pyx_v_blacklist;
+  CYTHON_UNUSED PyObject *__pyx_v_model_path = 0;
   CYTHON_UNUSED PyObject *__pyx_v_embedding_extractor = 0;
   CYTHON_UNUSED PyObject *__pyx_v_conll = 0;
   int __pyx_v_debug;
@@ -19218,14 +19218,14 @@ static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__cinit__ (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_nlp,&__pyx_n_s_utterances,&__pyx_n_s_use_no_coref_list,&__pyx_n_s_trained_embed_path,&__pyx_n_s_embedding_extractor,&__pyx_n_s_conll,&__pyx_n_s_debug,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_nlp,&__pyx_n_s_utterances,&__pyx_n_s_blacklist,&__pyx_n_s_model_path,&__pyx_n_s_embedding_extractor,&__pyx_n_s_conll,&__pyx_n_s_debug,0};
     PyObject* values[7] = {0,0,0,0,0,0,0};
     values[1] = ((PyObject *)Py_None);
 
     /* "neuralcoref/document.pyx":583
  *     def __cinit__(self, nlp, utterances=None,
- *                   bint use_no_coref_list=False,
- *                   trained_embed_path=None, embedding_extractor=None,             # <<<<<<<<<<<<<<
+ *                   bint blacklist=False,
+ *                   model_path=None, embedding_extractor=None,             # <<<<<<<<<<<<<<
  *                   conll=None,
  *                   bint debug=False):
  */
@@ -19233,8 +19233,8 @@ static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx
     values[4] = ((PyObject *)Py_None);
 
     /* "neuralcoref/document.pyx":584
- *                   bint use_no_coref_list=False,
- *                   trained_embed_path=None, embedding_extractor=None,
+ *                   bint blacklist=False,
+ *                   model_path=None, embedding_extractor=None,
  *                   conll=None,             # <<<<<<<<<<<<<<
  *                   bint debug=False):
  *         '''
@@ -19275,13 +19275,13 @@ static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx
         CYTHON_FALLTHROUGH;
         case  2:
         if (kw_args > 0) {
-          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_use_no_coref_list);
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_blacklist);
           if (value) { values[2] = value; kw_args--; }
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (kw_args > 0) {
-          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_trained_embed_path);
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_model_path);
           if (value) { values[3] = value; kw_args--; }
         }
         CYTHON_FALLTHROUGH;
@@ -19328,19 +19328,19 @@ static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx
     __pyx_v_nlp = values[0];
     __pyx_v_utterances = values[1];
     if (values[2]) {
-      __pyx_v_use_no_coref_list = __Pyx_PyObject_IsTrue(values[2]); if (unlikely((__pyx_v_use_no_coref_list == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 582, __pyx_L3_error)
+      __pyx_v_blacklist = __Pyx_PyObject_IsTrue(values[2]); if (unlikely((__pyx_v_blacklist == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 582, __pyx_L3_error)
     } else {
 
       /* "neuralcoref/document.pyx":582
  *     '''
  *     def __cinit__(self, nlp, utterances=None,
- *                   bint use_no_coref_list=False,             # <<<<<<<<<<<<<<
- *                   trained_embed_path=None, embedding_extractor=None,
+ *                   bint blacklist=False,             # <<<<<<<<<<<<<<
+ *                   model_path=None, embedding_extractor=None,
  *                   conll=None,
  */
-      __pyx_v_use_no_coref_list = ((int)0);
+      __pyx_v_blacklist = ((int)0);
     }
-    __pyx_v_trained_embed_path = values[3];
+    __pyx_v_model_path = values[3];
     __pyx_v_embedding_extractor = values[4];
     __pyx_v_conll = values[5];
     if (values[6]) {
@@ -19348,7 +19348,7 @@ static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx
     } else {
 
       /* "neuralcoref/document.pyx":585
- *                   trained_embed_path=None, embedding_extractor=None,
+ *                   model_path=None, embedding_extractor=None,
  *                   conll=None,
  *                   bint debug=False):             # <<<<<<<<<<<<<<
  *         '''
@@ -19365,14 +19365,14 @@ static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx
   __Pyx_RefNannyFinishContext();
   return -1;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_11neuralcoref_8document_8Document___cinit__(((struct __pyx_obj_11neuralcoref_8document_Document *)__pyx_v_self), __pyx_v_nlp, __pyx_v_utterances, __pyx_v_use_no_coref_list, __pyx_v_trained_embed_path, __pyx_v_embedding_extractor, __pyx_v_conll, __pyx_v_debug);
+  __pyx_r = __pyx_pf_11neuralcoref_8document_8Document___cinit__(((struct __pyx_obj_11neuralcoref_8document_Document *)__pyx_v_self), __pyx_v_nlp, __pyx_v_utterances, __pyx_v_blacklist, __pyx_v_model_path, __pyx_v_embedding_extractor, __pyx_v_conll, __pyx_v_debug);
 
   /* "neuralcoref/document.pyx":581
  *     Process utterances to extract mentions and pre-compute mentions features
  *     '''
  *     def __cinit__(self, nlp, utterances=None,             # <<<<<<<<<<<<<<
- *                   bint use_no_coref_list=False,
- *                   trained_embed_path=None, embedding_extractor=None,
+ *                   bint blacklist=False,
+ *                   model_path=None, embedding_extractor=None,
  */
 
   /* function exit code */
@@ -19380,7 +19380,7 @@ static int __pyx_pw_11neuralcoref_8document_8Document_1__cinit__(PyObject *__pyx
   return __pyx_r;
 }
 
-static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v_nlp, CYTHON_UNUSED PyObject *__pyx_v_utterances, int __pyx_v_use_no_coref_list, CYTHON_UNUSED PyObject *__pyx_v_trained_embed_path, CYTHON_UNUSED PyObject *__pyx_v_embedding_extractor, CYTHON_UNUSED PyObject *__pyx_v_conll, int __pyx_v_debug) {
+static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v_nlp, CYTHON_UNUSED PyObject *__pyx_v_utterances, int __pyx_v_blacklist, CYTHON_UNUSED PyObject *__pyx_v_model_path, CYTHON_UNUSED PyObject *__pyx_v_embedding_extractor, CYTHON_UNUSED PyObject *__pyx_v_conll, int __pyx_v_debug) {
   int __pyx_r;
   __Pyx_TraceDeclarations
   __Pyx_RefNannyDeclarations
@@ -19393,7 +19393,7 @@ static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj
  *         '''
  *         self.nlp = None             # <<<<<<<<<<<<<<
  *         self.mem = Pool()
- *         self.use_no_coref_list = use_no_coref_list
+ *         self.blacklist = blacklist
  */
   __Pyx_INCREF(Py_None);
   __Pyx_GIVEREF(Py_None);
@@ -19405,7 +19405,7 @@ static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj
  *         '''
  *         self.nlp = None
  *         self.mem = Pool()             # <<<<<<<<<<<<<<
- *         self.use_no_coref_list = use_no_coref_list
+ *         self.blacklist = blacklist
  *         self.debug = debug
  */
   __pyx_t_1 = __Pyx_PyObject_CallNoArg(((PyObject *)__pyx_ptype_5cymem_5cymem_Pool)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 589, __pyx_L1_error)
@@ -19419,15 +19419,15 @@ static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj
   /* "neuralcoref/document.pyx":590
  *         self.nlp = None
  *         self.mem = Pool()
- *         self.use_no_coref_list = use_no_coref_list             # <<<<<<<<<<<<<<
+ *         self.blacklist = blacklist             # <<<<<<<<<<<<<<
  *         self.debug = debug
  *         self.genre_ = None
  */
-  __pyx_v_self->use_no_coref_list = __pyx_v_use_no_coref_list;
+  __pyx_v_self->blacklist = __pyx_v_blacklist;
 
   /* "neuralcoref/document.pyx":591
  *         self.mem = Pool()
- *         self.use_no_coref_list = use_no_coref_list
+ *         self.blacklist = blacklist
  *         self.debug = debug             # <<<<<<<<<<<<<<
  *         self.genre_ = None
  *         self.genre = None
@@ -19435,7 +19435,7 @@ static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj
   __pyx_v_self->debug = __pyx_v_debug;
 
   /* "neuralcoref/document.pyx":592
- *         self.use_no_coref_list = use_no_coref_list
+ *         self.blacklist = blacklist
  *         self.debug = debug
  *         self.genre_ = None             # <<<<<<<<<<<<<<
  *         self.genre = None
@@ -19477,8 +19477,8 @@ static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj
  *     Process utterances to extract mentions and pre-compute mentions features
  *     '''
  *     def __cinit__(self, nlp, utterances=None,             # <<<<<<<<<<<<<<
- *                   bint use_no_coref_list=False,
- *                   trained_embed_path=None, embedding_extractor=None,
+ *                   bint blacklist=False,
+ *                   model_path=None, embedding_extractor=None,
  */
 
   /* function exit code */
@@ -19498,21 +19498,21 @@ static int __pyx_pf_11neuralcoref_8document_8Document___cinit__(struct __pyx_obj
  *         self.embed_extractor = None
  * 
  *     def __init__(self, nlp, utterances=None,             # <<<<<<<<<<<<<<
- *                  use_no_coref_list=False,
- *                  trained_embed_path=None, embedding_extractor=None,
+ *                  blacklist=False,
+ *                  model_path=None, embedding_extractor=None,
  */
 
 /* Python wrapper */
 static int __pyx_pw_11neuralcoref_8document_8Document_3__init__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_11neuralcoref_8document_8Document_2__init__[] = "\n        Arguments:\n            nlp (spaCy Language Class): A spaCy Language Class for processing the text input\n            utterances: utterance(s) to load already see self.set_utterances()\n            use_no_coref_list (boolean): use a list of term for which coreference is not preformed\n            pretrained_model_path (string): Path to a folder with pretrained word embeddings\n            embedding_extractor (EmbeddingExtractor): Use a pre-loaded word embeddings extractor\n            conll (string): If training on coNLL data: identifier of the document type\n            debug (boolean): print debug informations\n        ";
+static char __pyx_doc_11neuralcoref_8document_8Document_2__init__[] = "\n        Arguments:\n            nlp (spaCy Language Class): A spaCy Language Class for processing the text input\n            utterances: utterance(s) to load already see self.set_utterances()\n            blacklist (boolean): use a list of term for which coreference is not preformed\n            pretrained_model_path (string): Path to a folder with pretrained word embeddings\n            embedding_extractor (EmbeddingExtractor): Use a pre-loaded word embeddings extractor\n            conll (string): If training on coNLL data: identifier of the document type\n            debug (boolean): print debug informations\n        ";
 #if CYTHON_COMPILING_IN_CPYTHON
 struct wrapperbase __pyx_wrapperbase_11neuralcoref_8document_8Document_2__init__;
 #endif
 static int __pyx_pw_11neuralcoref_8document_8Document_3__init__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_nlp = 0;
   PyObject *__pyx_v_utterances = 0;
-  PyObject *__pyx_v_use_no_coref_list = 0;
-  PyObject *__pyx_v_trained_embed_path = 0;
+  PyObject *__pyx_v_blacklist = 0;
+  PyObject *__pyx_v_model_path = 0;
   PyObject *__pyx_v_embedding_extractor = 0;
   PyObject *__pyx_v_conll = 0;
   PyObject *__pyx_v_debug = 0;
@@ -19520,23 +19520,23 @@ static int __pyx_pw_11neuralcoref_8document_8Document_3__init__(PyObject *__pyx_
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__init__ (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_nlp,&__pyx_n_s_utterances,&__pyx_n_s_use_no_coref_list,&__pyx_n_s_trained_embed_path,&__pyx_n_s_embedding_extractor,&__pyx_n_s_conll,&__pyx_n_s_debug,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_nlp,&__pyx_n_s_utterances,&__pyx_n_s_blacklist,&__pyx_n_s_model_path,&__pyx_n_s_embedding_extractor,&__pyx_n_s_conll,&__pyx_n_s_debug,0};
     PyObject* values[7] = {0,0,0,0,0,0,0};
     values[1] = ((PyObject *)Py_None);
 
     /* "neuralcoref/document.pyx":597
  * 
  *     def __init__(self, nlp, utterances=None,
- *                  use_no_coref_list=False,             # <<<<<<<<<<<<<<
- *                  trained_embed_path=None, embedding_extractor=None,
+ *                  blacklist=False,             # <<<<<<<<<<<<<<
+ *                  model_path=None, embedding_extractor=None,
  *                  conll=None, debug=False):
  */
     values[2] = ((PyObject *)Py_False);
 
     /* "neuralcoref/document.pyx":598
  *     def __init__(self, nlp, utterances=None,
- *                  use_no_coref_list=False,
- *                  trained_embed_path=None, embedding_extractor=None,             # <<<<<<<<<<<<<<
+ *                  blacklist=False,
+ *                  model_path=None, embedding_extractor=None,             # <<<<<<<<<<<<<<
  *                  conll=None, debug=False):
  *         '''
  */
@@ -19544,8 +19544,8 @@ static int __pyx_pw_11neuralcoref_8document_8Document_3__init__(PyObject *__pyx_
     values[4] = ((PyObject *)Py_None);
 
     /* "neuralcoref/document.pyx":599
- *                  use_no_coref_list=False,
- *                  trained_embed_path=None, embedding_extractor=None,
+ *                  blacklist=False,
+ *                  model_path=None, embedding_extractor=None,
  *                  conll=None, debug=False):             # <<<<<<<<<<<<<<
  *         '''
  *         Arguments:
@@ -19587,13 +19587,13 @@ static int __pyx_pw_11neuralcoref_8document_8Document_3__init__(PyObject *__pyx_
         CYTHON_FALLTHROUGH;
         case  2:
         if (kw_args > 0) {
-          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_use_no_coref_list);
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_blacklist);
           if (value) { values[2] = value; kw_args--; }
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (kw_args > 0) {
-          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_trained_embed_path);
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_model_path);
           if (value) { values[3] = value; kw_args--; }
         }
         CYTHON_FALLTHROUGH;
@@ -19639,8 +19639,8 @@ static int __pyx_pw_11neuralcoref_8document_8Document_3__init__(PyObject *__pyx_
     }
     __pyx_v_nlp = values[0];
     __pyx_v_utterances = values[1];
-    __pyx_v_use_no_coref_list = values[2];
-    __pyx_v_trained_embed_path = values[3];
+    __pyx_v_blacklist = values[2];
+    __pyx_v_model_path = values[3];
     __pyx_v_embedding_extractor = values[4];
     __pyx_v_conll = values[5];
     __pyx_v_debug = values[6];
@@ -19653,14 +19653,14 @@ static int __pyx_pw_11neuralcoref_8document_8Document_3__init__(PyObject *__pyx_
   __Pyx_RefNannyFinishContext();
   return -1;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_11neuralcoref_8document_8Document_2__init__(((struct __pyx_obj_11neuralcoref_8document_Document *)__pyx_v_self), __pyx_v_nlp, __pyx_v_utterances, __pyx_v_use_no_coref_list, __pyx_v_trained_embed_path, __pyx_v_embedding_extractor, __pyx_v_conll, __pyx_v_debug);
+  __pyx_r = __pyx_pf_11neuralcoref_8document_8Document_2__init__(((struct __pyx_obj_11neuralcoref_8document_Document *)__pyx_v_self), __pyx_v_nlp, __pyx_v_utterances, __pyx_v_blacklist, __pyx_v_model_path, __pyx_v_embedding_extractor, __pyx_v_conll, __pyx_v_debug);
 
   /* "neuralcoref/document.pyx":596
  *         self.embed_extractor = None
  * 
  *     def __init__(self, nlp, utterances=None,             # <<<<<<<<<<<<<<
- *                  use_no_coref_list=False,
- *                  trained_embed_path=None, embedding_extractor=None,
+ *                  blacklist=False,
+ *                  model_path=None, embedding_extractor=None,
  */
 
   /* function exit code */
@@ -19668,7 +19668,7 @@ static int __pyx_pw_11neuralcoref_8document_8Document_3__init__(PyObject *__pyx_
   return __pyx_r;
 }
 
-static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, PyObject *__pyx_v_nlp, PyObject *__pyx_v_utterances, PyObject *__pyx_v_use_no_coref_list, PyObject *__pyx_v_trained_embed_path, PyObject *__pyx_v_embedding_extractor, PyObject *__pyx_v_conll, PyObject *__pyx_v_debug) {
+static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self, PyObject *__pyx_v_nlp, PyObject *__pyx_v_utterances, PyObject *__pyx_v_blacklist, PyObject *__pyx_v_model_path, PyObject *__pyx_v_embedding_extractor, PyObject *__pyx_v_conll, PyObject *__pyx_v_debug) {
   int __pyx_r;
   __Pyx_TraceDeclarations
   __Pyx_RefNannyDeclarations
@@ -19688,7 +19688,7 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
  *         '''
  *         self.nlp = nlp             # <<<<<<<<<<<<<<
  *         self.mem = Pool()
- *         self.use_no_coref_list = use_no_coref_list
+ *         self.blacklist = blacklist
  */
   __Pyx_INCREF(__pyx_v_nlp);
   __Pyx_GIVEREF(__pyx_v_nlp);
@@ -19700,7 +19700,7 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
  *         '''
  *         self.nlp = nlp
  *         self.mem = Pool()             # <<<<<<<<<<<<<<
- *         self.use_no_coref_list = use_no_coref_list
+ *         self.blacklist = blacklist
  *         self.debug = debug
  */
   __pyx_t_1 = __Pyx_PyObject_CallNoArg(((PyObject *)__pyx_ptype_5cymem_5cymem_Pool)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 611, __pyx_L1_error)
@@ -19714,29 +19714,29 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
   /* "neuralcoref/document.pyx":612
  *         self.nlp = nlp
  *         self.mem = Pool()
- *         self.use_no_coref_list = use_no_coref_list             # <<<<<<<<<<<<<<
+ *         self.blacklist = blacklist             # <<<<<<<<<<<<<<
  *         self.debug = debug
  *         self.genre_, self.genre = self.set_genre(conll)
  */
-  __pyx_t_2 = __Pyx_PyObject_IsTrue(__pyx_v_use_no_coref_list); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 612, __pyx_L1_error)
-  __pyx_v_self->use_no_coref_list = __pyx_t_2;
+  __pyx_t_2 = __Pyx_PyObject_IsTrue(__pyx_v_blacklist); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 612, __pyx_L1_error)
+  __pyx_v_self->blacklist = __pyx_t_2;
 
   /* "neuralcoref/document.pyx":613
  *         self.mem = Pool()
- *         self.use_no_coref_list = use_no_coref_list
+ *         self.blacklist = blacklist
  *         self.debug = debug             # <<<<<<<<<<<<<<
  *         self.genre_, self.genre = self.set_genre(conll)
- *         if trained_embed_path is not None and embedding_extractor is None:
+ *         if model_path is not None and embedding_extractor is None:
  */
   __pyx_t_2 = __Pyx_PyObject_IsTrue(__pyx_v_debug); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 613, __pyx_L1_error)
   __pyx_v_self->debug = __pyx_t_2;
 
   /* "neuralcoref/document.pyx":614
- *         self.use_no_coref_list = use_no_coref_list
+ *         self.blacklist = blacklist
  *         self.debug = debug
  *         self.genre_, self.genre = self.set_genre(conll)             # <<<<<<<<<<<<<<
- *         if trained_embed_path is not None and embedding_extractor is None:
- *             self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+ *         if model_path is not None and embedding_extractor is None:
+ *             self.embed_extractor = EmbeddingExtractor(model_path)
  */
   __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_set_genre); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 614, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
@@ -19843,11 +19843,11 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
   /* "neuralcoref/document.pyx":615
  *         self.debug = debug
  *         self.genre_, self.genre = self.set_genre(conll)
- *         if trained_embed_path is not None and embedding_extractor is None:             # <<<<<<<<<<<<<<
- *             self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+ *         if model_path is not None and embedding_extractor is None:             # <<<<<<<<<<<<<<
+ *             self.embed_extractor = EmbeddingExtractor(model_path)
  *         elif embedding_extractor is not None:
  */
-  __pyx_t_7 = (__pyx_v_trained_embed_path != Py_None);
+  __pyx_t_7 = (__pyx_v_model_path != Py_None);
   __pyx_t_8 = (__pyx_t_7 != 0);
   if (__pyx_t_8) {
   } else {
@@ -19862,8 +19862,8 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
 
     /* "neuralcoref/document.pyx":616
  *         self.genre_, self.genre = self.set_genre(conll)
- *         if trained_embed_path is not None and embedding_extractor is None:
- *             self.embed_extractor = EmbeddingExtractor(trained_embed_path)             # <<<<<<<<<<<<<<
+ *         if model_path is not None and embedding_extractor is None:
+ *             self.embed_extractor = EmbeddingExtractor(model_path)             # <<<<<<<<<<<<<<
  *         elif embedding_extractor is not None:
  *             self.embed_extractor = embedding_extractor
  */
@@ -19880,12 +19880,12 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
       }
     }
     if (!__pyx_t_3) {
-      __pyx_t_1 = __Pyx_PyObject_CallOneArg(__pyx_t_5, __pyx_v_trained_embed_path); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 616, __pyx_L1_error)
+      __pyx_t_1 = __Pyx_PyObject_CallOneArg(__pyx_t_5, __pyx_v_model_path); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 616, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     } else {
       #if CYTHON_FAST_PYCALL
       if (PyFunction_Check(__pyx_t_5)) {
-        PyObject *__pyx_temp[2] = {__pyx_t_3, __pyx_v_trained_embed_path};
+        PyObject *__pyx_temp[2] = {__pyx_t_3, __pyx_v_model_path};
         __pyx_t_1 = __Pyx_PyFunction_FastCall(__pyx_t_5, __pyx_temp+1-1, 1+1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 616, __pyx_L1_error)
         __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
         __Pyx_GOTREF(__pyx_t_1);
@@ -19893,7 +19893,7 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
       #endif
       #if CYTHON_FAST_PYCCALL
       if (__Pyx_PyFastCFunction_Check(__pyx_t_5)) {
-        PyObject *__pyx_temp[2] = {__pyx_t_3, __pyx_v_trained_embed_path};
+        PyObject *__pyx_temp[2] = {__pyx_t_3, __pyx_v_model_path};
         __pyx_t_1 = __Pyx_PyCFunction_FastCall(__pyx_t_5, __pyx_temp+1-1, 1+1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 616, __pyx_L1_error)
         __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
         __Pyx_GOTREF(__pyx_t_1);
@@ -19903,9 +19903,9 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
         __pyx_t_4 = PyTuple_New(1+1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 616, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_4);
         __Pyx_GIVEREF(__pyx_t_3); PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_3); __pyx_t_3 = NULL;
-        __Pyx_INCREF(__pyx_v_trained_embed_path);
-        __Pyx_GIVEREF(__pyx_v_trained_embed_path);
-        PyTuple_SET_ITEM(__pyx_t_4, 0+1, __pyx_v_trained_embed_path);
+        __Pyx_INCREF(__pyx_v_model_path);
+        __Pyx_GIVEREF(__pyx_v_model_path);
+        PyTuple_SET_ITEM(__pyx_t_4, 0+1, __pyx_v_model_path);
         __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_5, __pyx_t_4, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 616, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_1);
         __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
@@ -19921,16 +19921,16 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
     /* "neuralcoref/document.pyx":615
  *         self.debug = debug
  *         self.genre_, self.genre = self.set_genre(conll)
- *         if trained_embed_path is not None and embedding_extractor is None:             # <<<<<<<<<<<<<<
- *             self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+ *         if model_path is not None and embedding_extractor is None:             # <<<<<<<<<<<<<<
+ *             self.embed_extractor = EmbeddingExtractor(model_path)
  *         elif embedding_extractor is not None:
  */
     goto __pyx_L5;
   }
 
   /* "neuralcoref/document.pyx":617
- *         if trained_embed_path is not None and embedding_extractor is None:
- *             self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+ *         if model_path is not None and embedding_extractor is None:
+ *             self.embed_extractor = EmbeddingExtractor(model_path)
  *         elif embedding_extractor is not None:             # <<<<<<<<<<<<<<
  *             self.embed_extractor = embedding_extractor
  *         else:
@@ -19940,7 +19940,7 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
   if (__pyx_t_7) {
 
     /* "neuralcoref/document.pyx":618
- *             self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+ *             self.embed_extractor = EmbeddingExtractor(model_path)
  *         elif embedding_extractor is not None:
  *             self.embed_extractor = embedding_extractor             # <<<<<<<<<<<<<<
  *         else:
@@ -19953,8 +19953,8 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
     __pyx_v_self->embed_extractor = __pyx_v_embedding_extractor;
 
     /* "neuralcoref/document.pyx":617
- *         if trained_embed_path is not None and embedding_extractor is None:
- *             self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+ *         if model_path is not None and embedding_extractor is None:
+ *             self.embed_extractor = EmbeddingExtractor(model_path)
  *         elif embedding_extractor is not None:             # <<<<<<<<<<<<<<
  *             self.embed_extractor = embedding_extractor
  *         else:
@@ -20036,8 +20036,8 @@ static int __pyx_pf_11neuralcoref_8document_8Document_2__init__(struct __pyx_obj
  *         self.embed_extractor = None
  * 
  *     def __init__(self, nlp, utterances=None,             # <<<<<<<<<<<<<<
- *                  use_no_coref_list=False,
- *                  trained_embed_path=None, embedding_extractor=None,
+ *                  blacklist=False,
+ *                  model_path=None, embedding_extractor=None,
  */
 
   /* function exit code */
@@ -21334,7 +21334,7 @@ static PyObject *__pyx_gb_11neuralcoref_8document_8Document_14add_utterances_2ge
 
 /* "neuralcoref/document.pyx":688
  *         for utt_idx, doc in enumerate(docs):
- *             m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
+ *             m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)
  *             mentions += list(Mention(span, utt_idx, self.n_sents) for span in m_span)             # <<<<<<<<<<<<<<
  *             self.n_mentions += n_spans
  *             self.utterances.append(doc)
@@ -21817,7 +21817,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_8Document_add_utterances(struct
  *         mentions = []
  *         docs = self.nlp.pipe(utterances)             # <<<<<<<<<<<<<<
  *         for utt_idx, doc in enumerate(docs):
- *             m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
+ *             m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)
  */
   __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_cur_scope->__pyx_v_self->nlp, __pyx_n_s_pipe); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 685, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -21871,7 +21871,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_8Document_add_utterances(struct
  *         mentions = []
  *         docs = self.nlp.pipe(utterances)
  *         for utt_idx, doc in enumerate(docs):             # <<<<<<<<<<<<<<
- *             m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
+ *             m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)
  *             mentions += list(Mention(span, utt_idx, self.n_sents) for span in m_span)
  */
   __Pyx_INCREF(__pyx_int_0);
@@ -21930,13 +21930,13 @@ static PyObject *__pyx_f_11neuralcoref_8document_8Document_add_utterances(struct
     /* "neuralcoref/document.pyx":687
  *         docs = self.nlp.pipe(utterances)
  *         for utt_idx, doc in enumerate(docs):
- *             m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)             # <<<<<<<<<<<<<<
+ *             m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)             # <<<<<<<<<<<<<<
  *             mentions += list(Mention(span, utt_idx, self.n_sents) for span in m_span)
  *             self.n_mentions += n_spans
  */
     if (!(likely(((__pyx_v_doc) == Py_None) || likely(__Pyx_TypeTest(__pyx_v_doc, __pyx_ptype_5spacy_6tokens_3doc_Doc))))) __PYX_ERR(0, 687, __pyx_L1_error)
     __pyx_t_9.__pyx_n = 1;
-    __pyx_t_9.use_no_coref_list = __pyx_cur_scope->__pyx_v_self->use_no_coref_list;
+    __pyx_t_9.blacklist = __pyx_cur_scope->__pyx_v_self->blacklist;
     __pyx_t_6 = __pyx_f_11neuralcoref_8document_extract_mentions_spans(((struct __pyx_obj_5spacy_6tokens_3doc_Doc *)__pyx_v_doc), &__pyx_t_9); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 687, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
     if ((likely(PyTuple_CheckExact(__pyx_t_6))) || (PyList_CheckExact(__pyx_t_6))) {
@@ -21994,7 +21994,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_8Document_add_utterances(struct
 
     /* "neuralcoref/document.pyx":688
  *         for utt_idx, doc in enumerate(docs):
- *             m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
+ *             m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)
  *             mentions += list(Mention(span, utt_idx, self.n_sents) for span in m_span)             # <<<<<<<<<<<<<<
  *             self.n_mentions += n_spans
  *             self.utterances.append(doc)
@@ -22013,7 +22013,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_8Document_add_utterances(struct
     __pyx_t_6 = 0;
 
     /* "neuralcoref/document.pyx":689
- *             m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
+ *             m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)
  *             mentions += list(Mention(span, utt_idx, self.n_sents) for span in m_span)
  *             self.n_mentions += n_spans             # <<<<<<<<<<<<<<
  *             self.utterances.append(doc)
@@ -22057,7 +22057,7 @@ static PyObject *__pyx_f_11neuralcoref_8document_8Document_add_utterances(struct
  *         mentions = []
  *         docs = self.nlp.pipe(utterances)
  *         for utt_idx, doc in enumerate(docs):             # <<<<<<<<<<<<<<
- *             m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
+ *             m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)
  *             mentions += list(Mention(span, utt_idx, self.n_sents) for span in m_span)
  */
   }
@@ -25656,7 +25656,7 @@ static PyObject *__pyx_pf_11neuralcoref_8document_8Document_23get_pair_mentions_
  *     cdef Mention_C* c
  *     cdef readonly Pool mem             # <<<<<<<<<<<<<<
  *     cdef readonly object nlp
- *     cdef readonly bint use_no_coref_list
+ *     cdef readonly bint blacklist
  */
 
 /* Python wrapper */
@@ -25698,7 +25698,7 @@ static PyObject *__pyx_pf_11neuralcoref_8document_8Document_3mem___get__(struct 
  *     cdef Mention_C* c
  *     cdef readonly Pool mem
  *     cdef readonly object nlp             # <<<<<<<<<<<<<<
- *     cdef readonly bint use_no_coref_list
+ *     cdef readonly bint blacklist
  *     cdef readonly bint debug
  */
 
@@ -25740,25 +25740,25 @@ static PyObject *__pyx_pf_11neuralcoref_8document_8Document_3nlp___get__(struct 
 /* "neuralcoref/document.pxd":70
  *     cdef readonly Pool mem
  *     cdef readonly object nlp
- *     cdef readonly bint use_no_coref_list             # <<<<<<<<<<<<<<
+ *     cdef readonly bint blacklist             # <<<<<<<<<<<<<<
  *     cdef readonly bint debug
  *     cdef readonly object utterances
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_11neuralcoref_8document_8Document_17use_no_coref_list_1__get__(PyObject *__pyx_v_self); /*proto*/
-static PyObject *__pyx_pw_11neuralcoref_8document_8Document_17use_no_coref_list_1__get__(PyObject *__pyx_v_self) {
+static PyObject *__pyx_pw_11neuralcoref_8document_8Document_9blacklist_1__get__(PyObject *__pyx_v_self); /*proto*/
+static PyObject *__pyx_pw_11neuralcoref_8document_8Document_9blacklist_1__get__(PyObject *__pyx_v_self) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__get__ (wrapper)", 0);
-  __pyx_r = __pyx_pf_11neuralcoref_8document_8Document_17use_no_coref_list___get__(((struct __pyx_obj_11neuralcoref_8document_Document *)__pyx_v_self));
+  __pyx_r = __pyx_pf_11neuralcoref_8document_8Document_9blacklist___get__(((struct __pyx_obj_11neuralcoref_8document_Document *)__pyx_v_self));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_11neuralcoref_8document_8Document_17use_no_coref_list___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self) {
+static PyObject *__pyx_pf_11neuralcoref_8document_8Document_9blacklist___get__(struct __pyx_obj_11neuralcoref_8document_Document *__pyx_v_self) {
   PyObject *__pyx_r = NULL;
   __Pyx_TraceDeclarations
   __Pyx_RefNannyDeclarations
@@ -25766,7 +25766,7 @@ static PyObject *__pyx_pf_11neuralcoref_8document_8Document_17use_no_coref_list_
   __Pyx_RefNannySetupContext("__get__", 0);
   __Pyx_TraceCall("__get__", __pyx_f[2], 70, 0, __PYX_ERR(2, 70, __pyx_L1_error));
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->use_no_coref_list); if (unlikely(!__pyx_t_1)) __PYX_ERR(2, 70, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->blacklist); if (unlikely(!__pyx_t_1)) __PYX_ERR(2, 70, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -25775,7 +25775,7 @@ static PyObject *__pyx_pf_11neuralcoref_8document_8Document_17use_no_coref_list_
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_AddTraceback("neuralcoref.document.Document.use_no_coref_list.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("neuralcoref.document.Document.blacklist.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -25786,7 +25786,7 @@ static PyObject *__pyx_pf_11neuralcoref_8document_8Document_17use_no_coref_list_
 
 /* "neuralcoref/document.pxd":71
  *     cdef readonly object nlp
- *     cdef readonly bint use_no_coref_list
+ *     cdef readonly bint blacklist
  *     cdef readonly bint debug             # <<<<<<<<<<<<<<
  *     cdef readonly object utterances
  *     cdef readonly object mentions
@@ -25832,7 +25832,7 @@ static PyObject *__pyx_pf_11neuralcoref_8document_8Document_5debug___get__(struc
 }
 
 /* "neuralcoref/document.pxd":72
- *     cdef readonly bint use_no_coref_list
+ *     cdef readonly bint blacklist
  *     cdef readonly bint debug
  *     cdef readonly object utterances             # <<<<<<<<<<<<<<
  *     cdef readonly object mentions
@@ -44459,8 +44459,8 @@ static PyObject *__pyx_getprop_11neuralcoref_8document_8Document_nlp(PyObject *o
   return __pyx_pw_11neuralcoref_8document_8Document_3nlp_1__get__(o);
 }
 
-static PyObject *__pyx_getprop_11neuralcoref_8document_8Document_use_no_coref_list(PyObject *o, CYTHON_UNUSED void *x) {
-  return __pyx_pw_11neuralcoref_8document_8Document_17use_no_coref_list_1__get__(o);
+static PyObject *__pyx_getprop_11neuralcoref_8document_8Document_blacklist(PyObject *o, CYTHON_UNUSED void *x) {
+  return __pyx_pw_11neuralcoref_8document_8Document_9blacklist_1__get__(o);
 }
 
 static PyObject *__pyx_getprop_11neuralcoref_8document_8Document_debug(PyObject *o, CYTHON_UNUSED void *x) {
@@ -44522,7 +44522,7 @@ static PyMethodDef __pyx_methods_11neuralcoref_8document_Document[] = {
 static struct PyGetSetDef __pyx_getsets_11neuralcoref_8document_Document[] = {
   {(char *)"mem", __pyx_getprop_11neuralcoref_8document_8Document_mem, 0, (char *)0, 0},
   {(char *)"nlp", __pyx_getprop_11neuralcoref_8document_8Document_nlp, 0, (char *)0, 0},
-  {(char *)"use_no_coref_list", __pyx_getprop_11neuralcoref_8document_8Document_use_no_coref_list, 0, (char *)0, 0},
+  {(char *)"blacklist", __pyx_getprop_11neuralcoref_8document_8Document_blacklist, 0, (char *)0, 0},
   {(char *)"debug", __pyx_getprop_11neuralcoref_8document_8Document_debug, 0, (char *)0, 0},
   {(char *)"utterances", __pyx_getprop_11neuralcoref_8document_8Document_utterances, 0, (char *)0, 0},
   {(char *)"mentions", __pyx_getprop_11neuralcoref_8document_8Document_mentions, 0, (char *)0, 0},
@@ -47437,6 +47437,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_average_mean, __pyx_k_average_mean, sizeof(__pyx_k_average_mean), 0, 0, 1, 1},
   {&__pyx_n_s_axis, __pyx_k_axis, sizeof(__pyx_k_axis), 0, 0, 1, 1},
   {&__pyx_n_s_base, __pyx_k_base, sizeof(__pyx_k_base), 0, 0, 1, 1},
+  {&__pyx_n_s_blacklist, __pyx_k_blacklist, sizeof(__pyx_k_blacklist), 0, 0, 1, 1},
   {&__pyx_n_s_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 0, 1, 1},
   {&__pyx_n_u_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 1, 0, 1},
   {&__pyx_n_s_cinit___locals_genexpr, __pyx_k_cinit___locals_genexpr, sizeof(__pyx_k_cinit___locals_genexpr), 0, 0, 1, 1},
@@ -47555,6 +47556,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_u_minchild_c_c_head, __pyx_k_minchild_c_c_head, sizeof(__pyx_k_minchild_c_c_head), 0, 1, 0, 0},
   {&__pyx_kp_u_missing, __pyx_k_missing, sizeof(__pyx_k_missing), 0, 1, 0, 0},
   {&__pyx_n_s_mode, __pyx_k_mode, sizeof(__pyx_k_mode), 0, 0, 1, 1},
+  {&__pyx_n_s_model_path, __pyx_k_model_path, sizeof(__pyx_k_model_path), 0, 0, 1, 1},
   {&__pyx_n_s_module, __pyx_k_module, sizeof(__pyx_k_module), 0, 0, 1, 1},
   {&__pyx_n_s_ms, __pyx_k_ms, sizeof(__pyx_k_ms), 0, 0, 1, 1},
   {&__pyx_n_s_ms_lefts, __pyx_k_ms_lefts, sizeof(__pyx_k_ms_lefts), 0, 0, 1, 1},
@@ -47673,7 +47675,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_u_token_head, __pyx_k_token_head, sizeof(__pyx_k_token_head), 0, 1, 0, 0},
   {&__pyx_kp_u_token_in_no_coref_list, __pyx_k_token_in_no_coref_list, sizeof(__pyx_k_token_in_no_coref_list), 0, 1, 0, 0},
   {&__pyx_n_s_token_list, __pyx_k_token_list, sizeof(__pyx_k_token_list), 0, 0, 1, 1},
-  {&__pyx_n_s_trained_embed_path, __pyx_k_trained_embed_path, sizeof(__pyx_k_trained_embed_path), 0, 0, 1, 1},
   {&__pyx_n_s_tun_idx, __pyx_k_tun_idx, sizeof(__pyx_k_tun_idx), 0, 0, 1, 1},
   {&__pyx_n_s_tun_voc, __pyx_k_tun_voc, sizeof(__pyx_k_tun_voc), 0, 0, 1, 1},
   {&__pyx_n_s_tuned_embeddings, __pyx_k_tuned_embeddings, sizeof(__pyx_k_tuned_embeddings), 0, 0, 1, 1},
@@ -47685,7 +47686,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_u_unknown_dtype_code_in_numpy_pxd, __pyx_k_unknown_dtype_code_in_numpy_pxd, sizeof(__pyx_k_unknown_dtype_code_in_numpy_pxd), 0, 1, 0, 0},
   {&__pyx_n_s_unpack, __pyx_k_unpack, sizeof(__pyx_k_unpack), 0, 0, 1, 1},
   {&__pyx_n_s_update, __pyx_k_update, sizeof(__pyx_k_update), 0, 0, 1, 1},
-  {&__pyx_n_s_use_no_coref_list, __pyx_k_use_no_coref_list, sizeof(__pyx_k_use_no_coref_list), 0, 0, 1, 1},
   {&__pyx_kp_u_utf_8, __pyx_k_utf_8, sizeof(__pyx_k_utf_8), 0, 1, 0, 0},
   {&__pyx_n_s_utt, __pyx_k_utt, sizeof(__pyx_k_utt), 0, 0, 1, 1},
   {&__pyx_n_s_utt_embed, __pyx_k_utt_embed, sizeof(__pyx_k_utt_embed), 0, 0, 1, 1},
@@ -47835,14 +47835,14 @@ static int __Pyx_InitCachedConstants(void) {
  *         token = doc_c[i]
  *         if debug: print(" tok:", store[token.lex.lower], "tok.tag:", store[token.tag],             # <<<<<<<<<<<<<<
  *                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
  */
   __pyx_ustring__14 = PyUnicode_FromUnicode(__pyx_k__15, (sizeof(__pyx_k__15) / sizeof(Py_UNICODE))-1); if (unlikely(!__pyx_ustring__14)) __PYX_ERR(0, 198, __pyx_L1_error)
   if (__Pyx_PyUnicode_READY(__pyx_ustring__14) < 0) __PYX_ERR(0, 198, __pyx_L1_error)
 
   /* "neuralcoref/document.pyx":201
  *                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
- *         if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):
+ *         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
  *             if debug: print("token in no_coref_list")             # <<<<<<<<<<<<<<
  *             continue
  *         if (not inside(token.tag, hashes.keep_tags) or inside(token.dep, hashes.leave_dep) \

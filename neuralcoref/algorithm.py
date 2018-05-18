@@ -55,17 +55,6 @@ class Model(object):
                 features = np.maximum(features, 0) # ReLU
         return np.sum(features, axis=0)
 
-    def get_single_mention_score(self, mention, anaphoricity_features):
-        first_layer_input = np.concatenate([mention.embedding,
-                                            anaphoricity_features], axis=0)[:, np.newaxis]
-        return self._score(first_layer_input, self.single_mention_model)
-
-    def get_pair_mentions_score(self, antecedent, mention, pair_features):
-        first_layer_input = np.concatenate([antecedent.embedding,
-                                            mention.embedding,
-                                            pair_features], axis=0)[:, np.newaxis]
-        return self._score(first_layer_input, self.pair_mentions_model)
-
     def get_multiple_single_score(self, first_layer_input):
         return self._score(first_layer_input, self.single_mention_model)
 
@@ -78,13 +67,13 @@ class Coref(object):
     Main coreference resolution algorithm
     '''
     def __init__(self, nlp=None, greedyness=0.5, max_dist=50, max_dist_match=500, conll=None,
-                 use_no_coref_list=True, debug=False):
+                 blacklist=True, debug=False):
         self.greedyness = greedyness
         self.max_dist = max_dist
         self.max_dist_match = max_dist_match
         self.debug = debug
         model_path = os.path.join(PACKAGE_DIRECTORY, "weights/conll/" if conll is not None else "weights/")
-        trained_embed_path = os.path.join(PACKAGE_DIRECTORY, "weights/")
+        model_path = os.path.join(PACKAGE_DIRECTORY, "weights/")
         print("Loading neuralcoref model from", model_path)
         self.coref_model = Model(model_path)
         if nlp is None:
@@ -97,7 +86,7 @@ class Coref(object):
                 spacy.info('en')
                 model = 'en'
             nlp = spacy.load(model)
-        self.data = Document(nlp, conll=conll, use_no_coref_list=use_no_coref_list, trained_embed_path=trained_embed_path)
+        self.data = Document(nlp, conll=conll, blacklist=blacklist, model_path=model_path)
         self.clusters = {}
         self.mention_to_cluster = []
         self.mentions_single_scores = {}
@@ -267,9 +256,9 @@ class Coref(object):
         else:
             return self.data.utterances
 
-    def get_resolved_utterances(self, last_utterances_added=True, use_no_coref_list=True):
+    def get_resolved_utterances(self, last_utterances_added=True, blacklist=True):
         ''' Return a list of utterrances text where the '''
-        coreferences = self.get_most_representative(last_utterances_added, use_no_coref_list)
+        coreferences = self.get_most_representative(last_utterances_added, blacklist)
         resolved_utterances = []
         for utt in self.get_utterances(last_utterances_added=last_utterances_added):
             resolved_utt = ""
@@ -298,12 +287,12 @@ class Coref(object):
         return {"single_scores": self.mentions_single_scores,
                 "pair_scores": self.mentions_pairs_scores}
 
-    def get_clusters(self, remove_singletons=False, use_no_coref_list=False):
+    def get_clusters(self, remove_singletons=False, blacklist=False):
         ''' Retrieve cleaned clusters'''
         clusters = self.clusters
         mention_to_cluster = self.mention_to_cluster
         remove_id = []
-        if use_no_coref_list:
+        if blacklist:
             for key, mentions in clusters.items():
                 cleaned_list = []
                 for mention_idx in mentions:
@@ -334,14 +323,14 @@ class Coref(object):
 
         return clusters, mention_to_cluster
 
-    def get_most_representative(self, last_utterances_added=True, use_no_coref_list=True):
+    def get_most_representative(self, last_utterances_added=True, blacklist=True):
         '''
         Find a most representative mention for each cluster
 
         Return:
             Dictionnary of {original_mention: most_representative_resolved_mention, ...}
         '''
-        clusters, _ = self.get_clusters(remove_singletons=True, use_no_coref_list=use_no_coref_list)
+        clusters, _ = self.get_clusters(remove_singletons=True, blacklist=blacklist)
         coreferences = {}
         for key in self.data.get_candidate_mentions(last_utterances_added=last_utterances_added):
             if self.mention_to_cluster[key] is None:

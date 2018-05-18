@@ -71,11 +71,11 @@ The main class to import is `neuralcoref.Coref`.
 - `Coref.get_clusters()`: return the clusters computed during the coreference: dictionnary of list of mentions indexes. The mentions indexes are index in the list of mentions obtained by `Coref.get_mentions()`.
     Arguments:
     - `remove_singletons=True`: only send back cluster with more than one mention.
-    - `use_no_coref_list=True`: don't send back mentions in a list of words for which coreference is not necessary/tricky (currently "I" and "you").
+    - `blacklist=True`: don't send back mentions in a list of words for which coreference is not necessary/tricky (currently "I" and "you").
 - `Coref.get_most_representative()`: return a dictionnary of coreference with a *representative coreference* for each mention which has an antecedent. A *representative coreference* is typically a proper noun if there is one or a noun chunk if possible.
     Arguments:
     - `last_utterances_added=True`: only send back representative mentions for the coreferences resolved in the last utterances added.
-    - `use_no_coref_list=True`: don't send back representative mentions for a list of words for which coreference is not necessary/tricky (currently "I" and "you").
+    - `blacklist=True`: don't send back representative mentions for a list of words for which coreference is not necessary/tricky (currently "I" and "you").
 
 The source code contains details of the various arguments you can use.
 The code of `server.py` also provides a simple example.

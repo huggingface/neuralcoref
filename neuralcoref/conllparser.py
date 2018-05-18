@@ -590,7 +590,7 @@ class ConllCorpus(object):
         print("🌋 Building docs")
         for name, part in self.docs_names:
             self.docs.append(ConllDoc(name=name, part=part, nlp=None,
-                                      use_no_coref_list=False, consider_speakers=True,
+                                      blacklist=False, consider_speakers=True,
                                       embedding_extractor=self.embed_extractor,
                                       conll=CONLL_GENRES[name[:2]]))
         print("🌋 Loading spacy model")

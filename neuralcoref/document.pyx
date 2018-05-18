@@ -182,7 +182,7 @@ cdef add_span(int start, int end, SentSpans* mentions_spans, TokenC* doc_c,
     return mentions_spans.num >= mentions_spans.max_spans
 
 cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,
-                        HashesList hashes, StringStore store, bint use_no_coref_list=False,
+                        HashesList hashes, StringStore store, bint blacklist=False,
                         bint debug=False):
     '''
     Extract Pronouns and Noun phrases mentions from a spacy Span
@@ -197,7 +197,7 @@ cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* 
         token = doc_c[i]
         if debug: print("🚀 tok:", store[token.lex.lower], "tok.tag:", store[token.tag],
                         "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
-        if use_no_coref_list and inside(token.lex.lower, hashes.no_coref_list):
+        if blacklist and inside(token.lex.lower, hashes.no_coref_list):
             if debug: print("token in no_coref_list")
             continue
         if (not inside(token.tag, hashes.keep_tags) or inside(token.dep, hashes.leave_dep) \
@@ -293,7 +293,7 @@ cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* 
     #if debug: print("mentions_spans inside", mentions_spans)
     return
 
-cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=False, bint debug=False):
+cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=False):
     '''
     Extract potential mentions from a spacy parsed Doc
     '''
@@ -326,9 +326,9 @@ cdef extract_mentions_spans(Doc doc, bint use_no_coref_list=False, bint debug=Fa
     for i, sent in enumerate(doc.sents):
         _extract_from_sent(doc.c, sent.start, sent.end, &sent_spans[i],
                            hashes, doc.vocab.strings,
-                           use_no_coref_list=use_no_coref_list)
+                           blacklist=blacklist)
     #for spans in parallel_process([{'span': sent,
-    #                                'use_no_coref_list': use_no_coref_list} for sent in doc.sents],
+    #                                'blacklist': blacklist} for sent in doc.sents],
     #                            _extract_from_sent, use_kwargs=True, n_jobs=4, front_num=0):
     #    mentions_spans = mentions_spans + spans
     spans_set = set()
@@ -579,29 +579,29 @@ cdef class Document:
     Process utterances to extract mentions and pre-compute mentions features
     '''
     def __cinit__(self, nlp, utterances=None,
-                  bint use_no_coref_list=False,
-                  trained_embed_path=None, embedding_extractor=None,
+                  bint blacklist=False,
+                  model_path=None, embedding_extractor=None,
                   conll=None,
                   bint debug=False):
         '''
         '''
         self.nlp = None
         self.mem = Pool()
-        self.use_no_coref_list = use_no_coref_list
+        self.blacklist = blacklist
         self.debug = debug
         self.genre_ = None
         self.genre = None
         self.embed_extractor = None
 
     def __init__(self, nlp, utterances=None,
-                 use_no_coref_list=False,
-                 trained_embed_path=None, embedding_extractor=None,
+                 blacklist=False,
+                 model_path=None, embedding_extractor=None,
                  conll=None, debug=False):
         '''
         Arguments:
             nlp (spaCy Language Class): A spaCy Language Class for processing the text input
             utterances: utterance(s) to load already see self.set_utterances()
-            use_no_coref_list (boolean): use a list of term for which coreference is not preformed
+            blacklist (boolean): use a list of term for which coreference is not preformed
             pretrained_model_path (string): Path to a folder with pretrained word embeddings
             embedding_extractor (EmbeddingExtractor): Use a pre-loaded word embeddings extractor
             conll (string): If training on coNLL data: identifier of the document type
@@ -609,11 +609,11 @@ cdef class Document:
         '''
         self.nlp = nlp
         self.mem = Pool()
-        self.use_no_coref_list = use_no_coref_list
+        self.blacklist = blacklist
         self.debug = debug
         self.genre_, self.genre = self.set_genre(conll)
-        if trained_embed_path is not None and embedding_extractor is None:
-            self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+        if model_path is not None and embedding_extractor is None:
+            self.embed_extractor = EmbeddingExtractor(model_path)
         elif embedding_extractor is not None:
             self.embed_extractor = embedding_extractor
         else:
@@ -684,7 +684,7 @@ cdef class Document:
         mentions = []
         docs = self.nlp.pipe(utterances)
         for utt_idx, doc in enumerate(docs):
-            m_span, n_spans = extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list)
+            m_span, n_spans = extract_mentions_spans(doc, blacklist=self.blacklist)
             mentions += list(Mention(span, utt_idx, self.n_sents) for span in m_span)
             self.n_mentions += n_spans
             self.utterances.append(doc)

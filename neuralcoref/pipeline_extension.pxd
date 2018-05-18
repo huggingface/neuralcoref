@@ -58,27 +58,15 @@ cdef class Mention:
     cdef public object features
     cdef public object content_words
 
-    cpdef int heads_agree(self, Mention mention2)
-    cpdef int exact_match(self, Mention mention2)
-    cpdef int relaxed_match(self, Mention mention2)
-    cpdef int overlapping(self, Mention m2)
-
-cdef class Document:
-    cdef Mention_C* c
+cdef class CorefComponent(object):
     cdef readonly Pool mem
-    cdef readonly object nlp
-    cdef readonly bint blacklist
-    cdef readonly bint debug
-    cdef readonly object utterances
-    cdef readonly object mentions
-    cdef readonly int n_sents
-    cdef readonly int n_mentions
-    cdef readonly int n_pairs
-    cdef readonly object pairs_ant
-    cdef readonly object pairs_men
-    cdef readonly object genre_
-    cdef readonly object genre
-    cdef readonly object embed_extractor
+    cdef public float greedyness
+    cdef public int max_dist
+    cdef public int max_dist_match
+    cdef public bint blacklist
+    cdef public object coref_model
+    cdef public object embed_extractor
+    cdef public object name
+    cdef public object label
 
-    cdef add_utterances(self, utterances)
-    cdef set_mentions_features(self)
+    cdef build_clusters(self, doc)

@@ -39,7 +39,7 @@ MAX_ITER = 100
 ## MENTION EXTRACTION ###
 #########################
 
-def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
+def extract_mentions_spans(doc, blacklist=True, debug=False):
     '''
     Extract potential mentions from a spacy parsed Doc
     '''
@@ -52,7 +52,7 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
     if debug: print("==-- ents:", list(((ent, ent.label_) for ent in mentions_spans)))
     for spans in parallel_process([{'doc': doc,
                                     'span': sent,
-                                    'use_no_coref_list': use_no_coref_list} for sent in doc.sents],
+                                    'blacklist': blacklist} for sent in doc.sents],
                                 _extract_from_sent, use_kwargs=True, front_num=0):
         mentions_spans = mentions_spans + spans
     spans_set = set()
@@ -64,7 +64,7 @@ def extract_mentions_spans(doc, use_no_coref_list=True, debug=False):
 
     return cleaned_mentions_spans
 
-def _extract_from_sent(doc, span, use_no_coref_list=True, debug=False):
+def _extract_from_sent(doc, span, blacklist=True, debug=False):
     '''
     Extract Pronouns and Noun phrases mentions from a spacy Span
     '''
@@ -95,7 +95,7 @@ def _extract_from_sent(doc, span, use_no_coref_list=True, debug=False):
     for token in span:
         if debug: print("🚀 tok:", token, "tok.tag_:", token.tag_, "tok.pos_:", token.pos_, "tok.dep_:", token.dep_)
 
-        if use_no_coref_list and token.lower_ in NO_COREF_LIST:
+        if blacklist and token.lower_ in NO_COREF_LIST:
             if debug: print("token in no_coref_list")
             continue
         if (not keep_tags.match(token.tag_) or token.dep_ in leave_dep) and not token.dep_ in keep_dep:
@@ -478,8 +478,8 @@ class Document(object):
     Process utterances to extract mentions and pre-compute mentions features
     '''
     def __init__(self, nlp, utterances=None, utterances_speaker=None, speakers_names=None,
-                 use_no_coref_list=False, consider_speakers=False,
-                 trained_embed_path=None, embedding_extractor=None,
+                 blacklist=False, consider_speakers=False,
+                 model_path=None, embedding_extractor=None,
                  conll=None, debug=False):
         '''
         Arguments:
@@ -487,7 +487,7 @@ class Document(object):
             utterances: utterance(s) to load already see self.add_utterances()
             utterances_speaker: speaker(s) of utterance(s) to load already see self.add_utterances()
             speakers_names: speaker(s) of utterance(s) to load already see self.add_utterances()
-            use_no_coref_list (boolean): use a list of term for which coreference is not preformed
+            blacklist (boolean): use a list of term for which coreference is not preformed
             consider_speakers (boolean): consider speakers informations
             pretrained_model_path (string): Path to a folder with pretrained word embeddings
             embedding_extractor (EmbeddingExtractor): Use a pre-loaded word embeddings extractor
@@ -495,7 +495,7 @@ class Document(object):
             debug (boolean): print debug informations
         '''
         self.nlp = nlp
-        self.use_no_coref_list = use_no_coref_list
+        self.blacklist = blacklist
         self.utterances = []
         self.utterances_speaker = []
         self.last_utterances_loaded = []
@@ -507,8 +507,8 @@ class Document(object):
 
         self.genre_, self.genre = self.set_genre(conll)
 
-        if trained_embed_path is not None and embedding_extractor is None:
-            self.embed_extractor = EmbeddingExtractor(trained_embed_path)
+        if model_path is not None and embedding_extractor is None:
+            self.embed_extractor = EmbeddingExtractor(model_path)
         elif embedding_extractor is not None:
             self.embed_extractor = embedding_extractor
         else:
@@ -581,7 +581,7 @@ class Document(object):
         utterances_index = []
         utt_start = len(self.utterances)
         docs = list(self.nlp.pipe(utterances))
-        m_spans = list(extract_mentions_spans(doc, use_no_coref_list=self.use_no_coref_list) for doc in docs)
+        m_spans = list(extract_mentions_spans(doc, blacklist=self.blacklist) for doc in docs)
         for utt_index, (doc, m_spans, speaker_id) in enumerate(zip_longest(docs, m_spans, utterances_speaker)):
             if speaker_id not in self.speakers:
                 speaker_name = speakers_names.get(speaker_id, None) if speakers_names else None
@@ -736,7 +736,7 @@ def mention_detection_debug(sentence):
         model = 'en'
     nlp = spacy.load(model)
     doc = nlp(sentence.decode('utf-8'))
-    mentions = extract_mentions_spans(doc, use_no_coref_list=False, debug=True)
+    mentions = extract_mentions_spans(doc, blacklist=False, debug=True)
     for mention in mentions:
         print(mention)
 
