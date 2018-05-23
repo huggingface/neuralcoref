@@ -1,8 +1,9 @@
 from spacy.tokens.doc cimport Doc
 from spacy.tokens.span cimport Span
 from spacy.typedefs cimport flags_t, attr_t, hash_t
+from spacy.vectors import Vectors
 
-from spacy.structs cimport TokenC
+from spacy.structs cimport TokenC, LexemeC
 cimport numpy as np
 from cymem.cymem cimport Pool
 
@@ -29,44 +30,64 @@ cdef struct HashesList:
     Hashes conj_or_prep
     Hashes remove_pos
     Hashes lower_not_end
+    Hashes conj_tags
+    Hashes proper_tags
+    Hashes puncts
     hash_t POSSESSIVE_MARK
     hash_t NSUBJ_MARK
     hash_t IN_TAG
     hash_t MARK_DEP
 
 cdef struct Mention_C:
-    long entity_label
+    hash_t entity_label
+    int span_root
     int span_start
     int span_end
-    int utt_idx
     int sent_idx
+    int sent_start
+    int sent_end
     int mention_type
     hash_t root_lower
     hash_t span_lower
     Hashes content_words
-    float* embeddings
-    float* features
 
-cdef class Mention:
-    cdef readonly Span span
-    cdef public int utt_idx
-    cdef public int sent_idx
-    cdef public object spans_embeddings_
-    cdef public object words_embeddings_
-    cdef public object features_
-    cdef public object embeddings
-    cdef public object features
-    cdef public object content_words
+cdef class Model:
+    cdef int n_layers
+    cdef object s_weights
+    cdef object s_biases
+    cdef object p_weights
+    cdef object p_biases
+
+    cpdef float [:] get_score(self, float [:,:] features, bint single)
+
+cdef class EmbeddingExtractor(object):
+    cdef hash_t missing_word
+    cdef hash_t digit_word
+    cdef hash_t unknown_word
+    cdef object static
+    cdef object tuned
+    cdef object shape
+    cdef object fallback
+    cdef object conv_dict
+
+    cdef hash_t normalize(self, const LexemeC* c)
+    cdef float [:] get_static(self, hash_t word)
+    cdef float [:] get_word_embedding(self, const LexemeC* c, bint static=*, bint use_conv_dict=*)
+    cdef float [:] get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end)
+    cdef float [:] get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts, bint static=*, bint use_conv_dict=*)
+    cdef float [:] get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts) #, float [:] doc_embedding)
+
 
 cdef class CorefComponent(object):
-    cdef readonly Pool mem
-    cdef public float greedyness
-    cdef public int max_dist
-    cdef public int max_dist_match
-    cdef public bint blacklist
-    cdef public object coref_model
-    cdef public object embed_extractor
-    cdef public object name
-    cdef public object label
+    cdef Pool mem
+    cdef HashesList hashes
+    cdef float greedyness
+    cdef int max_dist
+    cdef int max_dist_match
+    cdef bint blacklist
+    cdef Model coref_model
+    cdef EmbeddingExtractor embed_extractor
+    cdef object name
+    cdef object label
 
-    cdef build_clusters(self, doc)
+    cdef build_clusters(self, Doc doc)

@@ -1,35 +1,43 @@
 # coding: utf8
-# cython: profile=True
-# cython: infer_types=True
+# cython: profile=True, infer_types=True, boundscheck=False
 # distutils: language=c++
 """Coref resolution spaCy v2.0 pipeline component 
 Custom pipeline components: https://spacy.io//usage/processing-pipelines#custom-components
 Compatible with: spaCy v2.0.0+
 """
 from __future__ import unicode_literals, print_function
+from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
 
 import plac
 import re
 import os
 import io
+from collections import OrderedDict
 from cpython cimport array
+cimport cython
 import array
 from libc.stdint cimport uint16_t, uint32_t, uint64_t, uintptr_t, int32_t
 
-import spacy
-from spacy.typedefs cimport hash_t
+cimport numpy as np
+np.import_array()
+import numpy
+
 from cymem.cymem cimport Pool
 from cpython.exc cimport PyErr_CheckSignals
 
+import spacy
+from spacy.typedefs cimport hash_t
+from spacy.structs cimport LexemeC, TokenC
 from spacy.lang.en import English
 from spacy.tokens.doc import Doc
 from spacy.tokens.span import Span
 from spacy.tokens.token import Token
 from spacy.tokens.token cimport Token
 from spacy.strings cimport StringStore
-cimport numpy as np
-np.import_array()
-import numpy
+from spacy.vocab cimport Vocab
+from spacy.lexeme cimport Lexeme
+from spacy.attrs cimport IS_DIGIT
+from spacy.vectors import Vectors
 
 from neuralcoref.utils import PACKAGE_DIRECTORY, encode_distance
 from neuralcoref.compat import unicode_
@@ -57,7 +65,7 @@ DEF MAX_FOLLOW_UP = 50
 
 DEF PAIR_FEATS_0 = SIZE_MENTION_EMBEDDING
 DEF PAIR_FEATS_1 = 2*SIZE_MENTION_EMBEDDING
-DEF PAIR_FEATS_2 = PAIR_FEATS_1+6
+DEF PAIR_FEATS_2 = PAIR_FEATS_1 + 6
 DEF PAIR_FEATS_3 = PAIR_FEATS_2 + MAX_BINS + 1
 DEF PAIR_FEATS_4 = PAIR_FEATS_3 + 1
 DEF PAIR_FEATS_5 = PAIR_FEATS_4 + MAX_BINS + 1
@@ -66,15 +74,83 @@ DEF PAIR_FEATS_7 = PAIR_FEATS_6 + SIZE_SNGL_FEATS
 DEF PAIR_FEATS_8 = PAIR_FEATS_7 + SIZE_SNGL_FEATS
 
 DEF SGNL_FEATS_0 = SIZE_MENTION_EMBEDDING
-DEF SGNL_FEATS_1 = SGNL_FEATS_0 + SIZE_SNGL_FEATS
+DEF SGNL_FEATS_1 = SGNL_FEATS_0 + 4
+DEF SGNL_FEATS_2 = SGNL_FEATS_1 + MAX_BINS + 1
+DEF SGNL_FEATS_3 = SGNL_FEATS_2 + 1
+DEF SGNL_FEATS_4 = SGNL_FEATS_3 + 1
+DEF SGNL_FEATS_5 = SGNL_FEATS_4 + 1
+
+DEF EMBED_01 = SIZE_EMBEDDING
+DEF EMBED_02 = 2 * SIZE_EMBEDDING
+DEF EMBED_03 = 3 * SIZE_EMBEDDING
+DEF EMBED_04 = 4 * SIZE_EMBEDDING
+DEF EMBED_05 = 5 * SIZE_EMBEDDING
+DEF EMBED_06 = 6 * SIZE_EMBEDDING
+DEF EMBED_07 = 7 * SIZE_EMBEDDING
+DEF EMBED_08 = 8 * SIZE_EMBEDDING
+DEF EMBED_09 = 9 * SIZE_EMBEDDING
+DEF EMBED_10 = 10 * SIZE_EMBEDDING
+DEF EMBED_11 = 11 * SIZE_EMBEDDING
+DEF EMBED_12 = 12 * SIZE_EMBEDDING
+DEF EMBED_13 = 13 * SIZE_EMBEDDING
 
 DISTANCE_BINS_PY = array.array('i', list(range(5)) + [5]*3 + [6]*8 + [7]*16 + [8]*32)
 
 cdef:
-    int[:] DISTANCE_BINS = DISTANCE_BINS_PY
-    float BINS_NUM = float(len(DISTANCE_BINS))
+    int [:] DISTANCE_BINS = DISTANCE_BINS_PY
+    int BINS_NUM = len(DISTANCE_BINS)
 
-cdef bint inside(hash_t element, Hashes hashes):
+MENTION_TYPE = {"PRONOMINAL": 0, "NOMINAL": 1, "PROPER": 2, "LIST": 3}
+MENTION_LABEL = {0: "PRONOMINAL", 1: "NOMINAL", 2: "PROPER", 3: "LIST"}
+NO_COREF_LIST = ["i", "me", "my", "you", "your"]
+KEEP_TAGS = ["NN", "NNP", "NNPS", "NNS", "PRP", "PRP$", "DT", "IN"]
+CONTENT_TAGS = ["NN", "NNS", "NNP", "NNPS"]
+PRP_TAGS = ["PRP", "PRP$"]
+CONJ_TAGS = ["CC", ","]
+PROPER_TAGS = ["NNP", "NNPS"]
+NSUBJ_OR_DEP = ["nsubj", "dep"]
+CONJ_OR_PREP = ["conj", "prep"]
+LEAVE_DEP = ["det", "compound", "appos"]
+KEEP_DEP = ["nsubj", "dobj", "iobj", "pobj"]
+REMOVE_POS = ["CCONJ", "INTJ", "ADP"]
+LOWER_NOT_END = ["'s", ',', '.', '!', '?', ':', ';']
+PUNCTS = [".", "!", "?"]
+ACCEPTED_ENTS = ["PERSON", "NORP", "FACILITY", "ORG", "GPE", "LOC", "PRODUCT", "EVENT", "WORK_OF_ART", "LANGUAGE"]
+WHITESPACE_PATTERN = r"\s+|_+"
+UNKNOWN_WORD = "*UNK*"
+MISSING_WORD = "<missing>"
+DEF MAX_ITER = 100
+DEF SPAN_FACTOR = 4
+
+cdef set_hashes_list(Hashes* hashes, py_list, StringStore store, Pool mem):
+    hashes.length = len(py_list)
+    hashes.arr = <hash_t*>mem.alloc(hashes.length, sizeof(hash_t))
+    for i, st in enumerate(py_list):
+        hashes.arr[i] = store.add(st)
+
+cdef HashesList get_hash_lookups(StringStore store, Pool mem):
+    cdef HashesList hashes
+    set_hashes_list(&hashes.no_coref_list, NO_COREF_LIST, store, mem)
+    set_hashes_list(&hashes.keep_tags, KEEP_TAGS, store, mem)
+    set_hashes_list(&hashes.PRP_tags, PRP_TAGS, store, mem)
+    set_hashes_list(&hashes.leave_dep, LEAVE_DEP, store, mem)
+    set_hashes_list(&hashes.keep_dep, KEEP_DEP, store, mem)
+    set_hashes_list(&hashes.nsubj_or_dep, NSUBJ_OR_DEP, store, mem)
+    set_hashes_list(&hashes.conj_or_prep, CONJ_OR_PREP, store, mem)
+    set_hashes_list(&hashes.remove_pos, REMOVE_POS, store, mem)
+    set_hashes_list(&hashes.lower_not_end, LOWER_NOT_END, store, mem)
+    set_hashes_list(&hashes.conj_tags, CONJ_TAGS, store, mem)
+    set_hashes_list(&hashes.proper_tags, PROPER_TAGS, store, mem)
+    set_hashes_list(&hashes.proper_tags, PROPER_TAGS, store, mem)
+    set_hashes_list(&hashes.puncts, PUNCTS, store, mem)
+    hashes.POSSESSIVE_MARK = store.add("'s")
+    hashes.NSUBJ_MARK = store.add("nsubj")
+    hashes.IN_TAG = store.add('IN')
+    hashes.MARK_DEP = store.add("mark")
+    return hashes
+
+@cython.profile(False)
+cdef inline bint inside(hash_t element, Hashes hashes) nogil:
     cdef int i
     cdef hash_t* arr = hashes.arr
     cdef int length = hashes.length
@@ -83,15 +159,35 @@ cdef bint inside(hash_t element, Hashes hashes):
             return True
     return False
 
-cdef index_distance(int d):
+@cython.profile(False)
+cdef inline int is_nested(Mention_C* c, int n_mentions, int m_idx):
+    for i in range(n_mentions):
+        if i == m_idx:
+            continue
+        if c[i].sent_idx == c[m_idx].sent_idx \
+            and c[i].span_start <= c[m_idx].span_start \
+            and c[i].span_end >= c[m_idx].span_end:
+            return 1
+    return 0
+
+@cython.profile(False)
+cdef inline (int, float) index_distance(int d) nogil:
     ''' Return index and value encoding to encode an integer as a (bined) one-hot array '''
-    cdef float float_val = min(float(d), BINS_NUM) / BINS_NUM
+    global BINS_NUM, DISTANCE_BINS
+    cdef float float_val
+    cdef int bin_d
+    float_val = min(float(d), float(BINS_NUM))
+    if BINS_NUM != 0:
+        float_val = float_val/ BINS_NUM
     if d < 64:
         # print('DISTANCE BINS LEN', len(DISTANCE_BINS), d, float_val)
-        return DISTANCE_BINS[d], float_val
-    return DISTANCE_BINS[-1] + 1, float_val
+        bin_d = DISTANCE_BINS[d]
+    else:
+        bin_d = DISTANCE_BINS[BINS_NUM-1] + 1
+    return bin_d, float_val
 
-cdef heads_agree(Mention_C m1, Mention_C m2):
+@cython.profile(False)
+cdef inline int heads_agree(Mention_C m1, Mention_C m2) nogil:
     ''' Does the root of the Mention match the root of another Mention/Span'''
     # In CoreNLP: they allow same-type NEs to not match perfectly
     # but rather one could be included in the other, e.g., "George" -> "George Bush"
@@ -99,11 +195,13 @@ cdef heads_agree(Mention_C m1, Mention_C m2):
     # In this cython C function, we take the simpler approach of directly comparing the roots hashes
     return 1 if m1.root_lower == m2.root_lower else 0
 
-cdef exact_match(Mention_C m1, Mention_C m2):
+@cython.profile(False)
+cdef inline int exact_match(Mention_C m1, Mention_C m2) nogil:
     ''' Does the Mention lowercase text matches another Mention/Span lowercase text'''
     return 1 if m1.span_lower == m2.span_lower else 0
 
-cdef relaxed_match(Mention_C m1, Mention_C m2):
+@cython.profile(False)
+cdef inline int relaxed_match(Mention_C m1, Mention_C m2) nogil:
     ''' Does the content words in m1 have at least one element in commmon
         with m2 content words'''
     cdef int i
@@ -112,44 +210,31 @@ cdef relaxed_match(Mention_C m1, Mention_C m2):
             return True
     return False
 
-cdef overlapping(Mention_C m1, Mention_C m2):
+@cython.profile(False)
+cdef inline int overlapping(Mention_C m1, Mention_C m2) nogil:
     if (m1.sent_idx == m2.sent_idx and m1.span_end > m2.span_start):
         return 1
     else:
         return 0
 
-cdef get_span_sent_number(Span span):
-    ''' Index of the sentence of a Span in its Doc'''
-    cdef int n = 0
-    cdef int i
-    cdef const TokenC* root = &span.doc.c[span.start]
+cdef (int, int, int) get_span_sent(Span span):
+    ''' return index (of the sentence), start and end of the sentence of a Span in its Doc'''
+    cdef:
+        int n = 0
+        int i
+        const TokenC* root = &span.doc.c[span.start]
     while root.head != 0: # find left edge
         root += root.head
         n += 1
         if n >= span.doc.length:
-            raise RuntimeError("Error while getting Mention sentence index")
-    n = -1
+            raise RuntimeError("Error while getting Mention sentence index. Infinite loop detected.")
+    n = 0
     for i in range(root.l_edge+1):
         if span.doc.c[i].sent_start == 1:
             n += 1
-    return n
+    return n, root.l_edge, root.r_edge + 1
 
-cdef get_span_type(Span span):
-    ''' Find the type of a Span '''
-    conj = ["CC", ","]
-    prp = ["PRP", "PRP$"]
-    proper = ["NNP", "NNPS"]
-    if any(t.tag_ in conj and t.ent_type_ not in ACCEPTED_ENTS for t in span):
-        mention_type = MENTION_TYPE["LIST"]
-    elif span.root.tag_ in prp:
-        mention_type = MENTION_TYPE["PRONOMINAL"]
-    elif span.root.ent_type_ in ACCEPTED_ENTS or span.root.tag_ in proper:
-        mention_type = MENTION_TYPE["PROPER"]
-    else:
-        mention_type = MENTION_TYPE["NOMINAL"]
-    return mention_type
-
-cdef get_span_entity_label(Span span):
+cdef hash_t get_span_entity_label(Span span):
     ''' Label of a detected named entity the Mention is nested in if any'''
     cdef int i
     cdef const TokenC* token
@@ -170,103 +255,45 @@ cdef get_span_entity_label(Span span):
             label = token.ent_id
     return label
 
+cdef get_span_type(Span span):
+    ''' Find the type of a Span '''
+    if any(t.tag_ in CONJ_TAGS and t.ent_type_ not in ACCEPTED_ENTS for t in span):
+        mention_type = MENTION_TYPE["LIST"]
+    elif span.root.tag_ in PRP_TAGS:
+        mention_type = MENTION_TYPE["PRONOMINAL"]
+    elif span.root.ent_type_ in ACCEPTED_ENTS or span.root.tag_ in PROPER_TAGS:
+        mention_type = MENTION_TYPE["PROPER"]
+    else:
+        mention_type = MENTION_TYPE["NOMINAL"]
+    return mention_type
+
 def get_resolved(doc, coreferences):
     ''' Return a list of utterrances text where the coref are resolved to the most representative mention'''
-    resolved = ""
-    in_coref = None
-    for tok in doc:
-        if in_coref is None:
-            for coref_original, coref_replace in coreferences:
-                if coref_original[0] == tok:
-                    in_coref = coref_original
-                    resolved += coref_replace.span.lower_
-                    break
-            if in_coref is None:
-                resolved += tok.text_with_ws
-        if in_coref is not None and tok == in_coref[-1]:
-            resolved += ' ' if tok.whitespace_ and resolved[-1] is not ' ' else ''
-            in_coref = None
-    return resolved
+    resolved = list(tok.text_with_ws for tok in doc)
+    for main, cluster in coreferences.items():
+        for coref in cluster:
+            if coref != main:
+                resolved[coref.start] = main.text + doc[coref.end-1].whitespace_
+                for i in range(coref.start+1, coref.end):
+                    resolved[i] = ""
+    return ''.join(resolved)
 
 #########################
 ## MENTION EXTRACTION ###
 #########################
-MENTION_TYPE = {"PRONOMINAL": 0, "NOMINAL": 1, "PROPER": 2, "LIST": 3}
-MENTION_LABEL = {0: "PRONOMINAL", 1: "NOMINAL", 2: "PROPER", 3: "LIST"}
-NO_COREF_LIST = ["i", "me", "my", "you", "your"]
-KEEP_TAGS = ["NN", "NNP", "NNPS", "NNS", "PRP", "PRP$", "DT", "IN"]
-CONTENT_TAGS = ["NN", "NNS", "NNP", "NNPS"]
-PRP_TAGS = ["PRP", "PRP$"]
-NSUBJ_OR_DEP = ["nsubj", "dep"]
-CONJ_OR_PREP = ["conj", "prep"]
-LEAVE_DEP = ["det", "compound", "appos"]
-KEEP_DEP = ["nsubj", "dobj", "iobj", "pobj"]
-REMOVE_POS = ["CCONJ", "INTJ", "ADP"]
-LOWER_NOT_END = ["'s", ',', '.', '!', '?', ':', ';']
-ACCEPTED_ENTS = ["PERSON", "NORP", "FACILITY", "ORG", "GPE", "LOC", "PRODUCT", "EVENT", "WORK_OF_ART", "LANGUAGE"]
-WHITESPACE_PATTERN = r"\s+|_+"
-UNKNOWN_WORD = "*UNK*"
-MISSING_WORD = "<missing>"
-DEF MAX_ITER = 100
-DEF SPAN_FACTOR = 4
-
-cdef HashesList get_hash_lookups(StringStore store, Pool mem):
-    cdef HashesList hashes
-    hashes.no_coref_list.length = len(NO_COREF_LIST)
-    hashes.no_coref_list.arr = <hash_t*>mem.alloc(hashes.no_coref_list.length, sizeof(hash_t))
-    for i, st in enumerate(NO_COREF_LIST):
-        hashes.no_coref_list.arr[i] = store.add(st)
-    hashes.keep_tags.length = len(KEEP_TAGS)
-    hashes.keep_tags.arr = <hash_t*>mem.alloc(hashes.keep_tags.length, sizeof(hash_t))
-    for i, st in enumerate(KEEP_TAGS):
-        hashes.keep_tags.arr[i] = store.add(st)
-    hashes.PRP_tags.length = len(PRP_TAGS)
-    hashes.PRP_tags.arr = <hash_t*>mem.alloc(hashes.PRP_tags.length, sizeof(hash_t))
-    for i, st in enumerate(PRP_TAGS):
-        hashes.PRP_tags.arr[i] = store.add(st)
-    hashes.leave_dep.length = len(LEAVE_DEP)
-    hashes.leave_dep.arr = <hash_t*>mem.alloc(hashes.leave_dep.length, sizeof(hash_t))
-    for i, st in enumerate(LEAVE_DEP):
-        hashes.leave_dep.arr[i] = store.add(st)
-    hashes.keep_dep.length = len(KEEP_DEP)
-    hashes.keep_dep.arr = <hash_t*>mem.alloc(hashes.keep_dep.length, sizeof(hash_t))
-    for i, st in enumerate(KEEP_DEP):
-        hashes.keep_dep.arr[i] = store.add(st)
-    hashes.nsubj_or_dep.length = len(NSUBJ_OR_DEP)
-    hashes.nsubj_or_dep.arr = <hash_t*>mem.alloc(hashes.nsubj_or_dep.length, sizeof(hash_t))
-    for i, st in enumerate(NSUBJ_OR_DEP):
-        hashes.nsubj_or_dep.arr[i] = store.add(st)
-    hashes.conj_or_prep.length = len(CONJ_OR_PREP)
-    hashes.conj_or_prep.arr = <hash_t*>mem.alloc(hashes.conj_or_prep.length, sizeof(hash_t))
-    for i, st in enumerate(CONJ_OR_PREP):
-        hashes.conj_or_prep.arr[i] = store.add(st)
-    hashes.remove_pos.length = len(REMOVE_POS)
-    hashes.remove_pos.arr = <hash_t*>mem.alloc(hashes.remove_pos.length, sizeof(hash_t))
-    for i, st in enumerate(REMOVE_POS):
-        hashes.remove_pos.arr[i] = store.add(st)
-    hashes.lower_not_end.length = len(LOWER_NOT_END)
-    hashes.lower_not_end.arr = <hash_t*>mem.alloc(hashes.lower_not_end.length, sizeof(hash_t))
-    for i, st in enumerate(LOWER_NOT_END):
-        hashes.lower_not_end.arr[i] = store.add(st)
-    hashes.POSSESSIVE_MARK = store.add("'s")
-    hashes.NSUBJ_MARK = store.add("nsubj")
-    hashes.IN_TAG = store.add('IN')
-    hashes.MARK_DEP = store.add("mark")
-    return hashes
-
 # Utility to remove bad endings
-cdef enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end, int test,
-                  HashesList hashes, StringStore store, bint debug=False):
+cdef (int, int) enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end, int test,
+                  HashesList hashes, StringStore store, bint debug=False) nogil:
     cdef int j
     cdef uint32_t minchild_idx
     cdef uint32_t maxchild_idx
-    if debug: print("⚜️ Enlarge span")
+    # if debug: print("⚜️ Enlarge span")
     minchild_idx = i
     maxchild_idx = i
     for j in range(sent_start, sent_end):
         c = doc_c[j]
         c_head = j + c.head
-        if debug: print("minchild c & c.head:", store[doc_c[j].lex.lower], store[doc_c[c_head].lex.lower])
+        # if debug: print("minchild c & c.head:", store[doc_c[j].lex.lower], store[doc_c[c_head].lex.lower])
         if c_head != i:
             continue
         if c.l_edge >= minchild_idx:
@@ -275,11 +302,11 @@ cdef enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end, int test,
                 or (test == 1 and inside(c.dep, hashes.nsubj_or_dep)) \
                 or (test == 2 and c.head == i and not inside(c.dep, hashes.conj_or_prep)):
             minchild_idx = c.l_edge
-            if debug: print("keep as minchild", store[doc_c[minchild_idx].lex.lower])
+            # if debug: print("keep as minchild", store[doc_c[minchild_idx].lex.lower])
     for j in range(sent_start, sent_end):
         c = doc_c[j]
         c_head = j + c.head
-        if debug: print("maxchild c & c.head:", store[doc_c[j].lex.lower], store[doc_c[c_head].lex.lower])
+        # if debug: print("maxchild c & c.head:", store[doc_c[j].lex.lower], store[doc_c[c_head].lex.lower])
         if c_head != i:
             continue
         if c.r_edge <= maxchild_idx:
@@ -288,65 +315,59 @@ cdef enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end, int test,
                 or (test == 1 and inside(c.dep, hashes.nsubj_or_dep)) \
                 or (test == 2 and c.head == i and not inside(c.dep, hashes.conj_or_prep)):
             maxchild_idx = c.r_edge
-            if debug: print("keep as maxchild", store[doc_c[maxchild_idx].lex.lower])
-    if debug:
-        print("left side before cleaning:", store[doc_c[minchild_idx].lex.lower])
-        print("right side before cleaning:", store[doc_c[maxchild_idx].lex.lower])
+            # if debug: print("keep as maxchild", store[doc_c[maxchild_idx].lex.lower])
+    # if debug: print("left side before cleaning:", store[doc_c[minchild_idx].lex.lower])
+    # if debug: print("right side before cleaning:", store[doc_c[maxchild_idx].lex.lower])
     # Clean up endings and begginging
     while maxchild_idx >= minchild_idx and (inside(doc_c[maxchild_idx].pos, hashes.remove_pos)
                                         or inside(doc_c[maxchild_idx].lex.lower, hashes.lower_not_end)):
-        PyErr_CheckSignals()
-        if debug: print("Removing last token", store[doc_c[maxchild_idx].lex.lower], store[doc_c[maxchild_idx].tag])
+        # PyErr_CheckSignals()
+        # if debug: print("Removing last token", store[doc_c[maxchild_idx].lex.lower], store[doc_c[maxchild_idx].tag])
         maxchild_idx -= 1 # We don't want mentions finishing with 's or conjunctions/punctuation
     while minchild_idx <= maxchild_idx and (inside(doc_c[minchild_idx].pos, hashes.remove_pos) 
                                         or inside(doc_c[minchild_idx].lex.lower, hashes.lower_not_end)):
-        PyErr_CheckSignals()
-        if debug: print("Removing first token", store[doc_c[minchild_idx].lex.lower], store[doc_c[minchild_idx].tag])
+        # PyErr_CheckSignals()
+        # if debug: print("Removing first token", store[doc_c[minchild_idx].lex.lower], store[doc_c[minchild_idx].tag])
         minchild_idx += 1 # We don't want mentions starting with 's or conjunctions/punctuation
-    if debug:
-        print("left side after cleaning:", store[doc_c[minchild_idx].lex.lower])
-        print("right side after cleaning:", store[doc_c[maxchild_idx].lex.lower])
+    # if debug: print("left side after cleaning:", store[doc_c[minchild_idx].lex.lower])
+    # if debug: print("right side after cleaning:", store[doc_c[maxchild_idx].lex.lower])
     return minchild_idx, maxchild_idx + 1
 
-cdef add_span(int start, int end, SentSpans* mentions_spans, TokenC* doc_c,
-              StringStore store, bint debug=False):
+cdef bint add_span(int start, int end, SentSpans* mentions_spans, TokenC* doc_c,
+              StringStore store, bint debug=False) nogil:
     cdef int num = mentions_spans.num
-    if debug:
-        print("🔥 Add span: " + ' '.join(store[doc_c[i].lex.lower] for i in range(start, end)))
+    # if debug: print("🔥 Add span: " + ' '.join(store[doc_c[i].lex.lower] for i in range(start, end)))
     mentions_spans.spans[num].start = start
     mentions_spans.spans[num].end = end
     mentions_spans.num += 1
-    if debug:
-        print("🔥 Add span: " + ' '.join(store[doc_c[i].lex.lower] for i in range(start, end)))
-        print("🔥 mentions_spans.num: ", mentions_spans.num)
+    # if debug: print("🔥 Add span: " + ' '.join(store[doc_c[i].lex.lower] for i in range(start, end)))
+    # if debug: print("🔥 mentions_spans.num: ", mentions_spans.num)
     return mentions_spans.num >= mentions_spans.max_spans
 
-cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,
+cdef void _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,
                         HashesList hashes, StringStore store, bint blacklist=False,
-                        bint debug=False):
+                        bint debug=False) nogil:
     '''
     Extract Pronouns and Noun phrases mentions from a spacy Span
     '''
     cdef int i, j, c_head, k, endIdx, minchild_idx, maxchild_idx, n_spans
     cdef bint test
-    if debug:
-        print("😎 Extract sents start, end:", sent_start, sent_end)
+    # if debug: print("😎 Extract sents start, end:", sent_start, sent_end)
 
     for i in range(sent_start, sent_end):
-        PyErr_CheckSignals()
+        # PyErr_CheckSignals()
         token = doc_c[i]
-        if debug: print("🚀 tok:", store[token.lex.lower], "tok.tag:", store[token.tag],
-                        "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
+        # if debug: print("🚀 tok:", store[token.lex.lower], "tok.tag:", store[token.tag], "tok.pos:", store[token.pos], "tok.dep:", store[token.dep])
         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
-            if debug: print("token in no_coref_list")
+            # if debug: print("token in no_coref_list")
             continue
         if (not inside(token.tag, hashes.keep_tags) or inside(token.dep, hashes.leave_dep) \
             and not inside(token.dep, hashes.keep_dep)):
-            if debug: print("not pronoun or no right dependency")
+            # if debug: print("not pronoun or no right dependency")
             continue
         # pronoun
         if inside(token.tag, hashes.PRP_tags): #re.match(r"PRP.*", token.tag_):
-            if debug: print("PRP")
+            # if debug: print("PRP")
             endIdx = i + 1
             #span = doc_c[i: endIdx]
             #if debug: print("==-- PRP store:", span)
@@ -360,34 +381,28 @@ cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* 
                 if test: return
             continue
         # Add NP mention
-        if debug:
-            print("NP or IN:", store[token.lex.lower])
-            if store[token.tag] == 'IN':
-                print("IN tag")
+        # if debug: print("NP or IN:", store[token.lex.lower])
         # Take care of 's
         if token.lex.lower == hashes.POSSESSIVE_MARK:
-            if debug: print("'s detected")
+            # if debug: print("'s detected")
             c_head = i + token.head
             j = 0
             while c_head != 0 and j < MAX_ITER:
-                if debug:
-                    print("token head:", c_head, doc_c[c_head].dep, "head:", c_head + doc_c[c_head].head)
+                # if debug: print("token head:", c_head, doc_c[c_head].dep, "head:", c_head + doc_c[c_head].head)
                 if doc_c[c_head].dep == hashes.NSUBJ_MARK:
                     start, end = enlarge_span(doc_c, c_head, sent_start, sent_end, 1, hashes, store)
-                    if debug: print("'s', i1:", store[doc_c[start].lex.lower], " i2:", store[doc_c[end].lex.lower])
+                    # if debug: print("'s', i1:", store[doc_c[start].lex.lower], " i2:", store[doc_c[end].lex.lower])
                     #if debug: print("==-- 's' store:", span)
                     test = add_span(start, end+1, mentions_spans, doc_c, store)
                     if test: return
                     break
                 c_head += doc_c[c_head].head
                 j += 1
-            assert j != MAX_ITER
             continue
 
         for j in range(sent_start, sent_end):
             c = doc_c[j]
-            if debug and j + c.head == i:
-                print("🚧 token in span:", store[c.lex.lower])#, "- head & dep:", c.head, c.dep)
+            #if debug and j + c.head == i: print("🚧 token in span:", store[c.lex.lower])#, "- head & dep:", c.head, c.dep)
         start, end = enlarge_span(doc_c, i, sent_start, sent_end, 0, hashes, store)
         if token.tag == hashes.IN_TAG and token.dep == hashes.MARK_DEP and start == end:
             start, end = enlarge_span(doc_c, i + token.head, sent_start, sent_end, 0, hashes, store)
@@ -407,15 +422,14 @@ cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* 
         #if debug:
         #    print("cleaned endings span:", doc_c[start:end])
         #    print("==-- full span store:", span)
-        if debug and token.tag == hashes.IN_TAG:
-            print("IN tag")
+        # if debug and token.tag == hashes.IN_TAG: print("IN tag")
         test = False
         for tok in doc_c[sent_start:sent_end]:
             if inside(tok.dep, hashes.conj_or_prep):
                 test = True
                 break
         if test:
-            if debug: print("Conjunction found, storing first element separately")
+            # if debug: print("Conjunction found, storing first element separately")
             #for c in doc:
             #    if c.head.i == i and inside(c.dep, hashes.conj_or_prep):
             #        if debug: print("left no conj:", c, 'dep & edge:', c.dep, c.left_edge)
@@ -433,14 +447,11 @@ cdef _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* 
     #if debug: print("mentions_spans inside", mentions_spans)
     return
 
-cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=True):
-    '''
-    Extract potential mentions from a spacy parsed Doc
-    '''
+cdef extract_mentions_spans(Doc doc, HashesList hashes, bint blacklist=False, bint debug=False):
+    ''' Extract potential mentions from a spacy parsed Doc '''
     cdef:
         int i, max_spans
         int n_sents
-        HashesList hashes
         SpanC spans_c
         int n_spans = 0
         Pool mem = Pool()
@@ -459,8 +470,6 @@ cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=True):
         sent_spans[i].spans = <SpanC*>mem.alloc(max_spans, sizeof(SpanC))
         sent_spans[i].max_spans = max_spans
         sent_spans[i].num = 0
-
-    hashes = get_hash_lookups(doc.vocab.strings, mem)
 
     if debug: print("==-- ents:", list(((ent, ent.label_) for ent in mentions_spans)))
     for i, sent in enumerate(doc.sents):
@@ -490,150 +499,160 @@ cdef extract_mentions_spans(Doc doc, bint blacklist=False, bint debug=True):
 #######################
 ###### CLASSES ########
 
-class Model(object):
+cdef class Model(object):
     ''' Coreference neural net model '''
-    def __init__(self, model_path):
-        weights, biases = [], []
-        for file in sorted(os.listdir(model_path)):
-            if file.startswith("single_mention_weights"):
-                w = numpy.load(os.path.join(model_path, file))
-                weights.append(w)
-            if file.startswith("single_mention_bias"):
-                w = numpy.load(os.path.join(model_path, file))
-                biases.append(w)
-        self.single_mention_model = list(zip(weights, biases))
-        weights, biases = [], []
-        for file in sorted(os.listdir(model_path)):
-            if file.startswith("pair_mentions_weights"):
-                w = numpy.load(os.path.join(model_path, file))
-                weights.append(w)
-            if file.startswith("pair_mentions_bias"):
-                w = numpy.load(os.path.join(model_path, file))
-                biases.append(w)
-        self.pair_mentions_model = list(zip(weights, biases))
+    def __cinit__(self, model_path):
+        self.n_layers = 0
 
-    def _score(self, features, layers):
-        for weights, bias in layers:
+    def __init__(self, model_path):
+        self.s_weights, self.s_biases, self.p_weights, self.p_biases = [], [], [], []
+        for file in sorted(os.listdir(model_path)):
+            if not file.endswith('.npy'):
+                continue
+            w = numpy.load(os.path.join(model_path, file)).astype(dtype='float32')
+            if file.startswith("single_mention_weights"):
+                self.s_weights.append(w)
+            if file.startswith("single_mention_bias"):
+                self.s_biases.append(w)
+            if file.startswith("pair_mentions_weights"):
+                self.p_weights.append(w)
+            if file.startswith("pair_mentions_bias"):
+                self.p_biases.append(w)
+        assert len(self.s_weights) == len(self.s_biases) == len(self.p_weights) == len(self.p_biases)
+        self.n_layers = len(self.s_weights)
+
+    cpdef float [:] get_score(self, float [:,:] features, bint single):
+        cdef:
+            int i
+            float [:] out
+            float [:, :] weights, bias
+        for i in range(self.n_layers):
+            weights = self.s_weights[i] if single else self.p_weights[i]
+            bias = self.s_biases[i] if single else self.p_biases[i]
             features = numpy.matmul(weights, features) + bias
             if weights.shape[0] > 1:
                 features = numpy.maximum(features, 0) # ReLU
-        return numpy.sum(features, axis=0)
+        out = numpy.sum(features, axis=0)
+        return out
 
-    def get_multiple_single_score(self, first_layer_input):
-        return self._score(first_layer_input, self.single_mention_model)
-
-    def get_multiple_pair_score(self, first_layer_input):
-        return self._score(first_layer_input, self.pair_mentions_model)
-
-
-class EmbeddingExtractor:
+cdef class EmbeddingExtractor(object):
     ''' Compute words embedding features for mentions '''
-    def __init__(self, pretrained_model_path):
-        _, self.static_embeddings, self.stat_idx, self.stat_voc = self.load_embeddings_from_file(pretrained_model_path + "static_word")
-        _, self.tuned_embeddings, self.tun_idx, self.tun_voc = self.load_embeddings_from_file(pretrained_model_path + "tuned_word")
-        self.fallback = self.static_embeddings.get(UNKNOWN_WORD)
+    def __cinit__(self, pretrained_model_path, Vocab vocab, conv_dict=None):
+        # First add our strings in the vocab to get hashes
+        self.unknown_word = vocab[UNKNOWN_WORD].orth
+        self.missing_word = vocab[MISSING_WORD].orth
+        self.digit_word = vocab[u"0"].orth
+        self.conv_dict = None
 
-        self.shape = self.static_embeddings[UNKNOWN_WORD].shape
-        shape2 = self.tuned_embeddings[UNKNOWN_WORD].shape
-        assert self.shape == shape2
+    def __init__(self, pretrained_model_path, Vocab vocab, conv_dict=None):
+        keys, mat = self.load_embeddings_from_file(pretrained_model_path + 'static_word', vocab.strings)
+        self.static = Vectors(shape=mat.shape, data=mat, keys=keys, name='coref_static')
+        keys, mat = self.load_embeddings_from_file(pretrained_model_path + 'tuned_word', vocab.strings)
+        self.tuned = Vectors(shape=mat.shape, data=mat, keys=keys, name='coref_tuned')
+        assert self.static.shape[1] == self.tuned.shape[1] == SIZE_EMBEDDING
+        self.shape = self.static.shape[1]
+        self.fallback = self.static[self.unknown_word]
+        if conv_dict is not None:
+            self.conv_dict = Vectors()
+            for key, words in conv_dict.items():
+                norm_k = self.normalize(vocab.get(key, vocab.mem))
+                norm_w = list(self.normalize(vocab.get(w, vocab.mem)) for w in words)
+                vect = self.average_list(norm_w)
+                self.conv_dict.add(norm_k, vector=vect)
 
     @staticmethod
-    def load_embeddings_from_file(name):
+    def load_embeddings_from_file(name, StringStore store):
         print("Loading embeddings from", name)
-        embeddings = {}
-        voc_to_idx = {}
-        idx_to_voc = []
+        keys = []
         mat = numpy.load(name+"_embeddings.npy").astype(dtype='float32')
-        average_mean = numpy.average(mat, axis=0, weights=numpy.sum(mat, axis=1))
         with io.open(name+"_vocabulary.txt", 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
-                embeddings[line.strip()] = mat[i, :]
-                voc_to_idx[line.strip()] = i
-                idx_to_voc.append(line.strip())
-        return average_mean, embeddings, voc_to_idx, idx_to_voc
+                keys.append(store.add(line.strip()))
+        return keys, mat
 
-    @staticmethod
-    def normalize_word(w):
-        if w is None:
-            return MISSING_WORD
-        return re.sub(r"\d", u"0", w.lower_)
-
-    def get_stat_word(self, word):
-        if word in self.static_embeddings:
-            return word, self.static_embeddings.get(word)
-        else:
-            return UNKNOWN_WORD, self.fallback
-
-    def get_word_embedding(self, word, static=False):
-        ''' Embedding for a single word (tuned if possible, otherwise static) '''
-        norm_word = self.normalize_word(word)
-        if static:
-            return self.get_stat_word(norm_word)
-        else:
-            if norm_word in self.tuned_embeddings:
-                return norm_word, self.tuned_embeddings.get(norm_word)
-            else:
-                return self.get_stat_word(norm_word)
- 
-    def get_word_in_sentence(self, word_idx, sentence):
-        ''' Embedding for a word in a sentence '''
-        if word_idx < sentence.start or word_idx >= sentence.end:
-            return self.get_word_embedding(None)
-        return self.get_word_embedding(sentence.doc[word_idx])
-
-    def get_average_embedding(self, token_list):
-        ''' Embedding for a list of words '''
+    def average_list(self, hash_list):
+        ''' Embed a list of words '''
+        cdef int i
         embed_vector = numpy.zeros(self.shape, dtype='float32') #We could also use numpy.copy(self.average_mean)
-        word_list = []
-        for tok in token_list:
-            if tok.lower_ not in [".", "!", "?"]:
-                word, embed = self.get_word_embedding(tok, static=True)
-                embed_vector += embed
-                word_list.append(word)
-        return word_list, (embed_vector/max(len(word_list), 1))
+        for hash_w in hash_list:
+            embed = self.tuned[hash_w] if hash_w in self.tuned else self.get_static(hash_w)
+            embed_vector = embed_vector + embed
+        return embed_vector/max(len(hash_list), 1)
 
-    def get_mention_embeddings(self, ms, doc_embedding):
+    cdef hash_t normalize(self, const LexemeC* c):
+        if c is NULL:
+            return self.missing_word
+        if Lexeme.c_check_flag(c, IS_DIGIT):
+            return self.digit_word
+        return c.lower
+
+    cdef float [:] get_static(self, hash_t word):
+        return self.static[word] if word in self.static else self.fallback
+
+    cdef float [:] get_word_embedding(self, const LexemeC* c, bint static=False, bint use_conv_dict=True):
+        ''' Embedding for a single word hash (tuned if possible, otherwise static) '''
+        hash_w = self.normalize(c)
+        if self.conv_dict is not None and use_conv_dict:
+            word = self.conv_dict.get(hash_w, None)
+            if word is not None:
+                return word
+        if static:
+            return self.get_static(hash_w)
+        else:
+            if hash_w in self.tuned:
+                return self.tuned[hash_w]
+            else:
+                return self.get_static(hash_w)
+ 
+    cdef float [:] get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end):
+        ''' Embedding for a word hash in a sentence '''
+        if word_idx < sent_start or word_idx >= sent_end:
+            return self.get_word_embedding(NULL)
+        return self.get_word_embedding(doc[word_idx].lex)
+
+    cdef float [:] get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts, bint static=True, bint use_conv_dict=True):
+        ''' Embedding for a list of word hashes '''
+        cdef:
+            int i
+            float [:] embed_vector, embed
+        embed_arr = numpy.zeros(self.shape, dtype='float32') #We could also use numpy.copy(self.average_mean)
+        for i in range(start, end):
+            t_lex = doc[i].lex
+            if not inside(t_lex.lower, puncts):
+                embed = self.get_word_embedding(t_lex, static=static, use_conv_dict=use_conv_dict)
+                embed_arr = embed_arr + embed
+        embed_vector = numpy.divide(embed_arr, float(max(end - start - 1, 1)))
+        return embed_vector
+
+    cdef float [:] get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts):#, float [:] doc_embedding):
         ''' Get span (averaged) and word (single) embeddings of a mention '''
-        st = ms.sent
-        ms_lefts = ms.doc[max(ms.start-5, st.start):ms.start]
-        ms_rights = ms.doc[ms.end:min(ms.end+5, st.end)]
-        head = ms.root.head
-        spans = [self.get_average_embedding(ms),
-                 self.get_average_embedding(ms_lefts),
-                 self.get_average_embedding(ms_rights),
-                 self.get_average_embedding(st),
-                 (unicode_(doc_embedding[0:8]) + "...", doc_embedding)]
-        words = [self.get_word_embedding(ms.root),
-                 self.get_word_embedding(ms[0]),
-                 self.get_word_embedding(ms[-1]),
-                 self.get_word_in_sentence(ms.start-1, st),
-                 self.get_word_in_sentence(ms.end, st),
-                 self.get_word_in_sentence(ms.start-2, st),
-                 self.get_word_in_sentence(ms.end+1, st),
-                 self.get_word_embedding(head)]
-        spans_embeddings_ = {"00_Mention": spans[0][0],
-                             "01_MentionLeft": spans[1][0],
-                             "02_MentionRight": spans[2][0],
-                             "03_Sentence": spans[3][0],
-                             "04_Doc": spans[4][0]}
-        words_embeddings_ = {"00_MentionHead": words[0][0],
-                             "01_MentionFirstWord": words[1][0],
-                             "02_MentionLastWord": words[2][0],
-                             "03_PreviousWord": words[3][0],
-                             "04_NextWord": words[4][0],
-                             "05_SecondPreviousWord": words[5][0],
-                             "06_SecondNextWord": words[6][0],
-                             "07_MentionRootHead": words[7][0]}
-        return (spans_embeddings_,
-                words_embeddings_,
-                numpy.concatenate([em[1] for em in spans], axis=0),
-                numpy.concatenate([em[1] for em in words], axis=0))
+        cdef:
+            float [:] embed
+            int head = m.span_root + doc[m.span_root].head
+        doc_embedding = 0
+        embeddings = numpy.zeros((EMBED_13, ), dtype='float32')
+        embed = embeddings
+        embed[:EMBED_01] = self.get_average_embedding(doc, m.span_start, m.span_end, puncts)
+        embed[EMBED_01:EMBED_02] = self.get_average_embedding(doc, max(m.span_start-5, m.sent_start), m.span_start, puncts)
+        embed[EMBED_02:EMBED_03] = self.get_average_embedding(doc, m.span_end, min(m.span_end+5, m.sent_end), puncts)
+        embed[EMBED_03:EMBED_04] = self.get_average_embedding(doc, m.span_start, m.sent_end, puncts)
+        embed[EMBED_04:EMBED_05] = doc_embedding
+        embed[EMBED_05:EMBED_06] = self.get_word_embedding(doc[m.span_root].lex)
+        embed[EMBED_06:EMBED_07] = self.get_word_embedding(doc[m.span_start].lex)
+        embed[EMBED_07:EMBED_08] = self.get_word_embedding(doc[m.span_end-1].lex)
+        embed[EMBED_08:EMBED_09] = self.get_word_in_sentence(m.span_start-1, doc, m.sent_start, m.sent_end)
+        embed[EMBED_09:EMBED_10] = self.get_word_in_sentence(m.span_end, doc, m.sent_start, m.sent_end)
+        embed[EMBED_10:EMBED_11] = self.get_word_in_sentence(m.span_start-2, doc, m.sent_start, m.sent_end)
+        embed[EMBED_11:EMBED_12] = self.get_word_in_sentence(m.span_end+1, doc, m.sent_start, m.sent_end)
+        embed[EMBED_12:        ] = self.get_word_embedding(doc[head].lex)
+        return embed
 
 
 cdef class CorefComponent(object):
     """spaCy v2.0 Coref pipeline component. """
     def __cinit__(self, nlp, label='coref',
-                 greedyness=0.5, max_dist=50, max_dist_match=500, blacklist=False):
+                  greedyness=0.5, max_dist=50, max_dist_match=500,
+                  conv_dict=None, blacklist=False):
         self.greedyness = greedyness
         self.max_dist = max_dist
         self.max_dist_match = max_dist_match
@@ -642,9 +661,11 @@ cdef class CorefComponent(object):
         self.embed_extractor = None
         self.name = None
         self.label = None
+        self.mem = Pool() # We use this for the allocations shared between all the docs (mainly the hashes)
+        self.hashes = get_hash_lookups(nlp.vocab.strings, self.mem)
 
     def __init__(self, nlp, label='coref', greedyness=0.5, max_dist=50,
-                 max_dist_match=500, blacklist=False):
+                 max_dist_match=500, conv_dict=None, blacklist=False):
         """Initialise the pipeline component.
         """
         self.name = 'coref' # component name, will show up in the pipeline
@@ -652,7 +673,7 @@ cdef class CorefComponent(object):
         model_path = os.path.join(PACKAGE_DIRECTORY, "weights/")
         print("Loading neuralcoref model from", model_path)
         self.coref_model = Model(model_path)
-        self.embed_extractor = EmbeddingExtractor(model_path)
+        self.embed_extractor = EmbeddingExtractor(model_path, nlp.vocab, conv_dict)
 
         # Register attributes on Doc and Span
         Doc.set_extension('has_coref', default=False)
@@ -663,7 +684,6 @@ cdef class CorefComponent(object):
         Span.set_extension('coref_cluster', default=None)
         Span.set_extension('coref_main', default=None)
 
-        print('Coref Initialized')
         # Register attribute on the Token. We'll be overwriting this based on
         # the matches, so we're only setting a default value, not a getter.
         # If no default value is set, it defaults to None.
@@ -683,66 +703,73 @@ cdef class CorefComponent(object):
     ###### FEATURE BUILDING FUNCTIONS #####
     #######################################
 
-    cdef build_clusters(self, doc):
+    cdef build_clusters(self, Doc doc):
         ''' Build coreference clusters '''
         cdef:
             Mention_C* c
             Mention_C m1, m2
-            uint64_t i, ant_idx, men_idx, b_idx # Should maybe be uint64_t (but we get a set of cython warnings)
+            TokenC* doc_c
+            uint64_t i, ant_idx, men_idx, b_idx, n_mentions, n_pairs
             uint64_t [:] p_ant, p_men, best_ant
-            float [:] embed, feats
+            float [:] embed, feats, doc_embed
             float [:, :] s_inp, p_inp
-            double [:] score, best_score
-            Pool mem = Pool()
+            float [:] score, best_score
+            Pool mem = Pool() # We use this for doc specific allocation
+
+            timespec ts
+            double curr_t0, curr_t1, curr_t2, curr_t3, curr_t4, curr_t5, curr_t6
+
+        # print("Build coreference clusters")
+        clock_gettime(CLOCK_REALTIME, &ts)
+        curr_t0 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
         strings = doc.vocab.strings
 
-        print('Coref Extract mentions')
+        # print("Extract mentions")
         # ''' Extract mentions '''
-        mentions, n_mentions = extract_mentions_spans(doc, blacklist=self.blacklist)
-
-        print('Coref Sorte and prepare mentions')
+        mentions, n_mentions = extract_mentions_spans(doc, self.hashes, blacklist=self.blacklist)
         n_sents = len(list(doc.sents))
         mentions = sorted((m for m in mentions), key=lambda m: (m.root.i, m.start))
         c = <Mention_C*>mem.alloc(n_mentions, sizeof(Mention_C))
-        print('Coref Fill up corefs C struct')
+        content_words = []
         for i, m in enumerate(mentions):
-            print('Coref Fill up corefs C struct step', i)
             c[i].entity_label = get_span_entity_label(m)
             c[i].span_start = m.start
             c[i].span_end = m.end
-            c[i].sent_idx = get_span_sent_number(m)
+            c[i].span_root = m.root.i
+            idx, sent_start, sent_end = get_span_sent(m)
+            c[i].sent_idx = idx
+            c[i].sent_start = sent_start
+            c[i].sent_end = sent_end
             c[i].mention_type = get_span_type(m)
             c[i].root_lower = (<Token>m.root).c.lex.lower
             c[i].span_lower = strings.add(m.text.lower())
-            content_words = set(tok.lower_ for tok in m if tok.tag_ in CONTENT_TAGS)
-            print('Coref Fill up corefs C struct set content words', content_words)
-            c[i].content_words.length = len(content_words)
-            c[i].content_words.arr = <hash_t*>mem.alloc(len(content_words), sizeof(hash_t))
-            for j, w in enumerate(content_words):
+            content_words.append(set(tok.lower_ for tok in m if tok.tag_ in CONTENT_TAGS))
+            c[i].content_words.length = len(content_words[-1])
+            c[i].content_words.arr = <hash_t*>mem.alloc(len(content_words[-1]), sizeof(hash_t))
+            for j, w in enumerate(content_words[-1]):
                 c[i].content_words.arr[j] = strings.add(w)
 
-        print('Coref Prepare arrays')
+        # print("Prepare arrays")
         # ''' Prepare arrays of pairs indices and features for feeding the model '''
+        # pairs_ant, pairs_mem, n_pairs = self.get_pairs(n_mentions, content_words)
         pairs_ant = []
         pairs_men = []
         n_pairs = 0
         if self.max_dist_match is not None:
             word_to_mentions = {}
             for i in range(n_mentions):
-                c_w = c[i].content_words
-                for j in range(c_w.length):
-                    tok = strings[c_w.arr[j]]
+                for tok in content_words[i]:
                     if not tok in word_to_mentions:
                         word_to_mentions[tok] = [i]
                     else:
                         word_to_mentions[tok].append(i)
         for i in range(n_mentions):
-            antecedents = set(range(i)) if self.max_dist is None else set(range(max(0, i - self.max_dist), i))
-            # if debug: print("antecedents", antecedents)
+            if self.max_dist is None:
+                antecedents = set(range(<object>i))
+            else:
+                antecedents = set(range(max(0, <object>i - self.max_dist), <object>i))
             if self.max_dist_match is not None:
-                c_w = c[i].content_words
-                for j in range(c_w.length):
-                    tok = strings[c_w.arr[j]]
+                for tok in content_words[i]:
                     with_string_match = word_to_mentions.get(tok, None)
                     for match_idx in with_string_match:
                         if match_idx < i and match_idx >= i - self.max_dist_match:
@@ -758,36 +785,34 @@ cdef class CorefComponent(object):
         p_inp_arr = numpy.zeros((SIZE_PAIR_IN_NO_GENRE + SIZE_GENRE, n_pairs), dtype='float32')
         s_inp = s_inp_arr
         p_inp = p_inp_arr
+        clock_gettime(CLOCK_REALTIME, &ts)
+        curr_t1 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
+        # print("n_mentions", n_mentions)
+        # print("mentions", mentions)
 
         # ''' Build single features and pair features arrays '''
-        _, doc_embedding = self.embed_extractor.get_average_embedding(doc)
-        print('build single features')
-        for i, mention in enumerate(mentions):
-            (_, _, spans_embeddings, words_embeddings) = self.embed_extractor.get_mention_embeddings(mention, doc_embedding)
-            print('set feats i', i)
-            one_hot_type = numpy.zeros((4,), dtype='float32')
-            one_hot_type[c[i].mention_type] = 1
-            features_ = {"01_MentionType": c[i].mention_type,
-                         "02_MentionLength": len(mention)-1,
-                         "03_MentionNormLocation": (i/n_mentions),
-                         "04_IsMentionNested": 1 if any((mentions[j] is not mention
-                                                          and c[j].sent_idx == c[i].sent_idx
-                                                          and c[j].span_start <= c[i].span_start
-                                                          and c[j].span_end <= c[i].span_end)
-                                                         for j in range(n_mentions)) else 0}
-            print('single features ok')
-            features = numpy.concatenate([one_hot_type,
-                                          encode_distance(features_["02_MentionLength"]),
-                                          numpy.array(features_["03_MentionNormLocation"], ndmin=1, copy=False, dtype='float32'),
-                                          numpy.array(features_["04_IsMentionNested"], ndmin=1, copy=False, dtype='float32')
-                                         ], axis=0)
-            embed_cont = numpy.concatenate([spans_embeddings, words_embeddings], axis=0)
-            embed = embed_cont
-            feats = features
+        # print("Build single features")
+        doc_c = doc.c
+        doc_embedding = self.embed_extractor.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
+        doc_embed = doc_embedding
+        # print("Build mentions features")
+        for i in range(n_mentions):
+            # print("Get embed for mention", i)
+            # struct_print(c[i], doc.vocab.strings)
+            embeddings = (<EmbeddingExtractor>self.embed_extractor).get_mention_embeddings(doc.c, c[i], self.hashes.puncts)#, doc_embed)
+            embed = embeddings
+            # print("Prepare array for mention", i)
             s_inp[:SGNL_FEATS_0, i] = embed
-            s_inp[SGNL_FEATS_0:SGNL_FEATS_1, i] = feats
-
-        print('build pair features')
+            s_inp[SGNL_FEATS_0 + c[i].mention_type, i] = 1
+            b_idx, val = index_distance(c[i].span_end - c[i].span_start - 1)
+            s_inp[SGNL_FEATS_1 + b_idx, i] = 1
+            s_inp[SGNL_FEATS_2, i] = val
+            val = float(i)/float(n_mentions)
+            s_inp[SGNL_FEATS_3, i] = val
+            s_inp[SGNL_FEATS_4, i] = is_nested(c, n_mentions, i)
+        clock_gettime(CLOCK_REALTIME, &ts)
+        curr_t2 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
+        # print("Build pair features")
         for i in range(n_pairs):
             ant_idx = p_ant[i]
             men_idx = p_men[i]
@@ -796,52 +821,54 @@ cdef class CorefComponent(object):
             p_inp[:PAIR_FEATS_0, i] = s_inp[:SGNL_FEATS_0, ant_idx]
             p_inp[PAIR_FEATS_0:PAIR_FEATS_1, i] = s_inp[:SGNL_FEATS_0, men_idx]
             p_inp[PAIR_FEATS_1, i] = 1
-            p_inp[PAIR_FEATS_1 + 1, i] = 0
-            p_inp[PAIR_FEATS_1 + 2, i] = 0
+            # p_inp[PAIR_FEATS_1 + 1, i] = 0 # arrays are initialized to zero
+            # p_inp[PAIR_FEATS_1 + 2, i] = 0
             p_inp[PAIR_FEATS_1 + 3, i] = heads_agree(m1, m2)
             p_inp[PAIR_FEATS_1 + 4, i] = exact_match(m1, m2)
             p_inp[PAIR_FEATS_1 + 5, i] = relaxed_match(m1, m2)
             b_idx, val = index_distance(m2.sent_idx - m1.sent_idx)
-            p_inp[PAIR_FEATS_2:PAIR_FEATS_3, i] = 0
+            # p_inp[PAIR_FEATS_2:PAIR_FEATS_3, i] = 0
             p_inp[PAIR_FEATS_2 + b_idx, i] = 1
             p_inp[PAIR_FEATS_3, i] = val
             b_idx, val = index_distance(men_idx - ant_idx - 1)
-            p_inp[PAIR_FEATS_4:PAIR_FEATS_5, i] = 0
+            # p_inp[PAIR_FEATS_4:PAIR_FEATS_5, i] = 0
             p_inp[PAIR_FEATS_4 + b_idx, i] = 1
             p_inp[PAIR_FEATS_5, i] = val
             p_inp[PAIR_FEATS_5 + 1, i] = overlapping(m1, m2)
-            p_inp[PAIR_FEATS_6:PAIR_FEATS_7, i] = s_inp[SGNL_FEATS_0:SGNL_FEATS_1, ant_idx]
-            p_inp[PAIR_FEATS_7:PAIR_FEATS_8, i] = s_inp[SGNL_FEATS_0:SGNL_FEATS_1, men_idx]
+            p_inp[PAIR_FEATS_6:PAIR_FEATS_7, i] = s_inp[SGNL_FEATS_0:SGNL_FEATS_5, ant_idx]
+            p_inp[PAIR_FEATS_7:PAIR_FEATS_8, i] = s_inp[SGNL_FEATS_0:SGNL_FEATS_5, men_idx]
+        clock_gettime(CLOCK_REALTIME, &ts)
+        curr_t3 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
 
+        # print("Compute scores")
         # ''' Compute scores '''
-        best_score_ar = numpy.empty((n_mentions), dtype='float64')
+        best_score_ar = numpy.empty((n_mentions), dtype='float32')
         best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
         best_score = best_score_ar
         best_ant = best_ant_ar
-        print('Computing Single mention scores')
-        score = self.coref_model.get_multiple_single_score(s_inp)
+        score = self.coref_model.get_score(s_inp, single=True)
         for i in range(n_mentions):
             best_score[i] = score[i] - 50 * (self.greedyness - 0.5)
             best_ant[i] = i
-        print('Computing pair mention scores')
-        score = self.coref_model.get_multiple_pair_score(p_inp)
+        score = self.coref_model.get_score(p_inp, single=False)
         for i in range(n_pairs):
             ant_idx = p_ant[i]
             men_idx = p_men[i]
             if score[i] > best_score[men_idx]:
                 best_score[men_idx] = score[i]
                 best_ant[men_idx] = ant_idx
+        clock_gettime(CLOCK_REALTIME, &ts)
+        curr_t4 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
 
+        # print("Build clusters")
         # ''' Build clusters '''
         mention_to_cluster = list(range(n_mentions))
         cluster_to_main = list(range(n_mentions))
         clusters = dict((i, [i]) for i in mention_to_cluster)
-        print("merge clusters")
         for mention_idx, ant_idx in enumerate(best_ant):
             if ant_idx != mention_idx:
                 if mention_to_cluster[ant_idx] == mention_to_cluster[mention_idx]:
                     continue
-                print("Merge clusters", ant_idx, mention_idx)
                 keep_id = mention_to_cluster[ant_idx]
                 remove_id = mention_to_cluster[mention_idx]
                 for idx in clusters[remove_id]:
@@ -852,13 +879,10 @@ cdef class CorefComponent(object):
                     if c[mention_idx].mention_type == MENTION_TYPE["PROPER"] \
                         or (c[mention_idx].mention_type == MENTION_TYPE["NOMINAL"] and
                                 c[ant_idx].mention_type == MENTION_TYPE["PRONOMINAL"]):
-                        print("Update representative mention of cluster")
                         cluster_to_main[ant_idx] = mention_idx
-        print("Remove singleton clusters and convert rest to spans")
         remove_id = []
         main = list(mentions)
         mentions_list = []
-        coreferences = []
         clusters_list = {}
         for key, m_idx_list in clusters.items():
             if len(m_idx_list) != 1:
@@ -866,17 +890,41 @@ cdef class CorefComponent(object):
                 main = mentions[cluster_to_main[key]]
                 mentions_list += m_list
                 clusters_list[main] = m_list
-                coreferences += list((main, m) for m in m_list)
+        clock_gettime(CLOCK_REALTIME, &ts)
+        curr_t5 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
 
+        # print("Update doc")
         # ''' Update doc '''
         if len(clusters) != 0:
             doc._.set('has_coref', True)
             doc._.set('coref_mentions', mentions_list)
             doc._.set('coref_clusters', clusters_list)
-            doc._.set('coref_resolved', get_resolved(doc, coreferences))
+            doc._.set('coref_resolved', get_resolved(doc, clusters_list))
             for main, m_list in clusters_list.items():
                 for mention in m_list:
                     mention._.set('is_coref', True)
                     mention._.set('coref_cluster', m_list)
                     mention._.set('coref_main', main)
+        clock_gettime(CLOCK_REALTIME, &ts)
+        curr_t6 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
+        print("timing",
+              "\nExtract mentions and Prepare arrays", <object>curr_t1,
+              "\nBuild single features", <object>curr_t2,
+              "\nBuild pair features", <object>curr_t3,
+              "\nCompute scores", <object>curr_t4,
+              "\nBuild clusters", <object>curr_t5,
+              "\nUpdate doc", <object>curr_t6)
         return doc
+
+#cdef struct_print(Mention_C mention, StringStore strings):
+#    print("== span_lower", <object>strings[mention.span_lower])
+#    print("entity_label", <object>mention.entity_label)
+#    print("span_root", <object>mention.span_root)
+#    print("span_start", <object>mention.span_start)
+#    print("span_end", <object>mention.span_end)
+#    print("sent_idx", <object>mention.sent_idx)
+#    print("sent_start", <object>mention.sent_start)
+#    print("sent_end", <object>mention.sent_end)
+#    print("mention_type", <object>mention.mention_type)
+#    print("root_lower", <object>strings[mention.root_lower])
+#    print("- content_words --")
