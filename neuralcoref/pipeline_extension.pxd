@@ -2,7 +2,7 @@ from spacy.tokens.doc cimport Doc
 from spacy.tokens.span cimport Span
 from spacy.typedefs cimport flags_t, attr_t, hash_t
 from spacy.vectors import Vectors
-
+from spacy.strings cimport StringStore
 from spacy.structs cimport TokenC, LexemeC
 cimport numpy as np
 from cymem.cymem cimport Pool
@@ -72,10 +72,10 @@ cdef class EmbeddingExtractor(object):
 
     cdef hash_t normalize(self, const LexemeC* c)
     cdef float [:] get_static(self, hash_t word)
-    cdef float [:] get_word_embedding(self, const LexemeC* c, bint static=*, bint use_conv_dict=*)
+    cdef float [:] get_word_embedding(self, const LexemeC* c, bint static=*)
     cdef float [:] get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end)
-    cdef float [:] get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts, bint static=*, bint use_conv_dict=*)
-    cdef float [:] get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts) #, float [:] doc_embedding)
+    cdef float [:] get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts, StringStore strings)
+    cdef float [:] get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts, StringStore strings, float [:] doc_embedding)
 
 
 cdef class CorefComponent(object):

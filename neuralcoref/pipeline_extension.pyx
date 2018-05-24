@@ -42,11 +42,11 @@ from spacy.vectors import Vectors
 from neuralcoref.utils import PACKAGE_DIRECTORY, encode_distance
 from neuralcoref.compat import unicode_
 
-#######################
-##### UTILITIES #######
-DEF SIZE_SPAN = 250 # size of the span vector (averaged word embeddings)
+##############################
+##### A BUNCH OF SIZES #######
 DEF SIZE_WORD = 8 # number of words in a mention (tuned embeddings)
 DEF SIZE_EMBEDDING = 50 # size of the words embeddings
+DEF SIZE_SPAN = 5 * SIZE_EMBEDDING # size of the span vector (averaged word embeddings)
 DEF SIZE_PAIR_FEATS = 63 # number of features for a pair of mention
 DEF SIZE_FP_COMPRESSED = 9 # size of the features for a pair of mentions as stored in numpy arrays
 DEF SIZE_SNGL_FEATS = 17 # number of features of a single mention
@@ -60,11 +60,8 @@ DEF SIZE_PAIR_IN_NO_GENRE = 2 * SIZE_MENTION_EMBEDDING + SIZE_PAIR_FEATS
 DEF SIZE_PAIR_IN = 2 * SIZE_MENTION_EMBEDDING + SIZE_FP # Input to the mentions pair neural network
 DEF SIZE_SINGLE_IN = SIZE_MENTION_EMBEDDING + SIZE_FS  # Input to the single mention neural network
 
-DEF MAX_BINS = 9
-DEF MAX_FOLLOW_UP = 50
-
 DEF PAIR_FEATS_0 = SIZE_MENTION_EMBEDDING
-DEF PAIR_FEATS_1 = 2*SIZE_MENTION_EMBEDDING
+DEF PAIR_FEATS_1 = 2 * SIZE_MENTION_EMBEDDING
 DEF PAIR_FEATS_2 = PAIR_FEATS_1 + 6
 DEF PAIR_FEATS_3 = PAIR_FEATS_2 + MAX_BINS + 1
 DEF PAIR_FEATS_4 = PAIR_FEATS_3 + 1
@@ -94,15 +91,23 @@ DEF EMBED_11 = 11 * SIZE_EMBEDDING
 DEF EMBED_12 = 12 * SIZE_EMBEDDING
 DEF EMBED_13 = 13 * SIZE_EMBEDDING
 
+DEF MAX_BINS = 9
+DEF MAX_FOLLOW_UP = 50
+DEF MAX_ITER = 100
+DEF SPAN_FACTOR = 4
+
 DISTANCE_BINS_PY = array.array('i', list(range(5)) + [5]*3 + [6]*8 + [7]*16 + [8]*32)
 
 cdef:
     int [:] DISTANCE_BINS = DISTANCE_BINS_PY
     int BINS_NUM = len(DISTANCE_BINS)
 
+##########################################################
+##### STRINGS USED IN RULE_BASED MENTION DETECTION #######
+
+NO_COREF_LIST = ["i", "me", "my", "you", "your"]
 MENTION_TYPE = {"PRONOMINAL": 0, "NOMINAL": 1, "PROPER": 2, "LIST": 3}
 MENTION_LABEL = {0: "PRONOMINAL", 1: "NOMINAL", 2: "PROPER", 3: "LIST"}
-NO_COREF_LIST = ["i", "me", "my", "you", "your"]
 KEEP_TAGS = ["NN", "NNP", "NNPS", "NNS", "PRP", "PRP$", "DT", "IN"]
 CONTENT_TAGS = ["NN", "NNS", "NNP", "NNPS"]
 PRP_TAGS = ["PRP", "PRP$"]
@@ -119,8 +124,9 @@ ACCEPTED_ENTS = ["PERSON", "NORP", "FACILITY", "ORG", "GPE", "LOC", "PRODUCT", "
 WHITESPACE_PATTERN = r"\s+|_+"
 UNKNOWN_WORD = "*UNK*"
 MISSING_WORD = "<missing>"
-DEF MAX_ITER = 100
-DEF SPAN_FACTOR = 4
+
+###############################################################
+##### UTILITIES TO CONVERT SAID STRINGS IN SPACY HASHES #######
 
 cdef set_hashes_list(Hashes* hashes, py_list, StringStore store, Pool mem):
     hashes.length = len(py_list)
@@ -159,6 +165,9 @@ cdef inline bint inside(hash_t element, Hashes hashes) nogil:
             return True
     return False
 
+#########################################
+##### A BUNCH OF CYTHON UTILITIES #######
+
 @cython.profile(False)
 cdef inline int is_nested(Mention_C* c, int n_mentions, int m_idx):
     for i in range(n_mentions):
@@ -179,11 +188,7 @@ cdef inline (int, float) index_distance(int d) nogil:
     float_val = min(float(d), float(BINS_NUM))
     if BINS_NUM != 0:
         float_val = float_val/ BINS_NUM
-    if d < 64:
-        # print('DISTANCE BINS LEN', len(DISTANCE_BINS), d, float_val)
-        bin_d = DISTANCE_BINS[d]
-    else:
-        bin_d = DISTANCE_BINS[BINS_NUM-1] + 1
+    bin_d = DISTANCE_BINS[d] if d < 64 else DISTANCE_BINS[BINS_NUM-1] + 1
     return bin_d, float_val
 
 @cython.profile(False)
@@ -283,7 +288,7 @@ def get_resolved(doc, coreferences):
 #########################
 # Utility to remove bad endings
 cdef (int, int) enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end, int test,
-                  HashesList hashes, StringStore store, bint debug=False) nogil:
+                  HashesList hashes, StringStore store, bint debug=False):
     cdef int j
     cdef uint32_t minchild_idx
     cdef uint32_t maxchild_idx
@@ -334,7 +339,7 @@ cdef (int, int) enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end,
     return minchild_idx, maxchild_idx + 1
 
 cdef bint add_span(int start, int end, SentSpans* mentions_spans, TokenC* doc_c,
-              StringStore store, bint debug=False) nogil:
+              StringStore store, bint debug=False):
     cdef int num = mentions_spans.num
     # if debug: print("🔥 Add span: " + ' '.join(store[doc_c[i].lex.lower] for i in range(start, end)))
     mentions_spans.spans[num].start = start
@@ -346,10 +351,8 @@ cdef bint add_span(int start, int end, SentSpans* mentions_spans, TokenC* doc_c,
 
 cdef void _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSpans* mentions_spans,
                         HashesList hashes, StringStore store, bint blacklist=False,
-                        bint debug=False) nogil:
-    '''
-    Extract Pronouns and Noun phrases mentions from a spacy Span
-    '''
+                        bint debug=False):
+    ''' Extract Pronouns and Noun phrases mentions from a spacy Span '''
     cdef int i, j, c_head, k, endIdx, minchild_idx, maxchild_idx, n_spans
     cdef bint test
     # if debug: print("😎 Extract sents start, end:", sent_start, sent_end)
@@ -370,13 +373,13 @@ cdef void _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSp
             # if debug: print("PRP")
             endIdx = i + 1
             #span = doc_c[i: endIdx]
-            #if debug: print("==-- PRP store:", span)
+            ## if debug: print("==-- PRP store:", span)
             test = add_span(i, i+1, mentions_spans, doc_c, store)
             if test: return
             # when pronoun is a part of conjunction (e.g., you and I)
             if token.r_kids > 0 or token.l_kids > 0:
                 #span = doc[token.l_edge : token.r_edge+1]
-                #if debug: print("==-- in conj store:", span)
+                ## if debug: print("==-- in conj store:", span)
                 test = add_span(token.l_edge, token.r_edge+1, mentions_spans, doc_c, store)
                 if test: return
             continue
@@ -392,7 +395,7 @@ cdef void _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSp
                 if doc_c[c_head].dep == hashes.NSUBJ_MARK:
                     start, end = enlarge_span(doc_c, c_head, sent_start, sent_end, 1, hashes, store)
                     # if debug: print("'s', i1:", store[doc_c[start].lex.lower], " i2:", store[doc_c[end].lex.lower])
-                    #if debug: print("==-- 's' store:", span)
+                    ## if debug: print("==-- 's' store:", span)
                     test = add_span(start, end+1, mentions_spans, doc_c, store)
                     if test: return
                     break
@@ -456,9 +459,9 @@ cdef extract_mentions_spans(Doc doc, HashesList hashes, bint blacklist=False, bi
         int n_spans = 0
         Pool mem = Pool()
 
-    if debug: print('===== doc ====:', doc)
-    for c in doc:
-        if debug: print("🚧 span search:", c, "head:", c.head, "tag:", c.tag_, "pos:", c.pos_, "dep:", c.dep_)
+    # if debug: print('===== doc ====:', doc)
+    # for c in doc:
+        # if debug: print("🚧 span search:", c, "head:", c.head, "tag:", c.tag_, "pos:", c.pos_, "dep:", c.dep_)
     # Named entities
     mentions_spans = list(ent for ent in doc.ents if ent.label_ in ACCEPTED_ENTS)
 
@@ -471,7 +474,7 @@ cdef extract_mentions_spans(Doc doc, HashesList hashes, bint blacklist=False, bi
         sent_spans[i].max_spans = max_spans
         sent_spans[i].num = 0
 
-    if debug: print("==-- ents:", list(((ent, ent.label_) for ent in mentions_spans)))
+    # if debug: print("==-- ents:", list(((ent, ent.label_) for ent in mentions_spans)))
     for i, sent in enumerate(doc.sents):
         _extract_from_sent(doc.c, sent.start, sent.end, &sent_spans[i],
                            hashes, doc.vocab.strings,
@@ -493,7 +496,7 @@ cdef extract_mentions_spans(Doc doc, HashesList hashes, bint blacklist=False, bi
                 n_spans += 1
     sorted_spans = sorted(spans_set)
     cleaned_mentions_spans = [doc[s[0]:s[1]] for s in sorted_spans]
-    if debug: print("cleaned_mentions_spans", cleaned_mentions_spans)
+    # if debug: print("cleaned_mentions_spans", cleaned_mentions_spans)
     return cleaned_mentions_spans, n_spans
 
 #######################
@@ -562,7 +565,7 @@ cdef class EmbeddingExtractor(object):
 
     @staticmethod
     def load_embeddings_from_file(name, StringStore store):
-        print("Loading embeddings from", name)
+        # print("Loading embeddings from", name)
         keys = []
         mat = numpy.load(name+"_embeddings.npy").astype(dtype='float32')
         with io.open(name+"_vocabulary.txt", 'r', encoding='utf-8') as f:
@@ -589,10 +592,10 @@ cdef class EmbeddingExtractor(object):
     cdef float [:] get_static(self, hash_t word):
         return self.static[word] if word in self.static else self.fallback
 
-    cdef float [:] get_word_embedding(self, const LexemeC* c, bint static=False, bint use_conv_dict=True):
+    cdef float [:] get_word_embedding(self, const LexemeC* c, bint static=False):
         ''' Embedding for a single word hash (tuned if possible, otherwise static) '''
         hash_w = self.normalize(c)
-        if self.conv_dict is not None and use_conv_dict:
+        if self.conv_dict is not None:
             word = self.conv_dict.get(hash_w, None)
             if word is not None:
                 return word
@@ -610,32 +613,34 @@ cdef class EmbeddingExtractor(object):
             return self.get_word_embedding(NULL)
         return self.get_word_embedding(doc[word_idx].lex)
 
-    cdef float [:] get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts, bint static=True, bint use_conv_dict=True):
+    cdef float [:] get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts, StringStore strings):
         ''' Embedding for a list of word hashes '''
         cdef:
             int i
+            int n = 0
             float [:] embed_vector, embed
         embed_arr = numpy.zeros(self.shape, dtype='float32') #We could also use numpy.copy(self.average_mean)
         for i in range(start, end):
             t_lex = doc[i].lex
             if not inside(t_lex.lower, puncts):
-                embed = self.get_word_embedding(t_lex, static=static, use_conv_dict=use_conv_dict)
+                n += 1
+                embed = self.get_word_embedding(t_lex, static=True)
                 embed_arr = embed_arr + embed
-        embed_vector = numpy.divide(embed_arr, float(max(end - start - 1, 1)))
+        embed_vector = numpy.divide(embed_arr, float(max(n, 1)))
         return embed_vector
 
-    cdef float [:] get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts):#, float [:] doc_embedding):
+    cdef float [:] get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts, StringStore strings, float [:] doc_embedding):
         ''' Get span (averaged) and word (single) embeddings of a mention '''
         cdef:
             float [:] embed
             int head = m.span_root + doc[m.span_root].head
-        doc_embedding = 0
+        # doc_embedding = 0
         embeddings = numpy.zeros((EMBED_13, ), dtype='float32')
         embed = embeddings
-        embed[:EMBED_01] = self.get_average_embedding(doc, m.span_start, m.span_end, puncts)
-        embed[EMBED_01:EMBED_02] = self.get_average_embedding(doc, max(m.span_start-5, m.sent_start), m.span_start, puncts)
-        embed[EMBED_02:EMBED_03] = self.get_average_embedding(doc, m.span_end, min(m.span_end+5, m.sent_end), puncts)
-        embed[EMBED_03:EMBED_04] = self.get_average_embedding(doc, m.span_start, m.sent_end, puncts)
+        embed[:EMBED_01]         = self.get_average_embedding(doc, m.span_start, m.span_end, puncts, strings)
+        embed[EMBED_01:EMBED_02] = self.get_average_embedding(doc, max(m.span_start-5, m.sent_start), m.span_start, puncts, strings)
+        embed[EMBED_02:EMBED_03] = self.get_average_embedding(doc, m.span_end, min(m.span_end + 5, m.sent_end), puncts, strings)
+        embed[EMBED_03:EMBED_04] = self.get_average_embedding(doc, m.sent_start, m.sent_end, puncts, strings)
         embed[EMBED_04:EMBED_05] = doc_embedding
         embed[EMBED_05:EMBED_06] = self.get_word_embedding(doc[m.span_root].lex)
         embed[EMBED_06:EMBED_07] = self.get_word_embedding(doc[m.span_start].lex)
@@ -671,7 +676,7 @@ cdef class CorefComponent(object):
         self.name = 'coref' # component name, will show up in the pipeline
         self.label = nlp.vocab.strings[label]  # get entity label ID
         model_path = os.path.join(PACKAGE_DIRECTORY, "weights/")
-        print("Loading neuralcoref model from", model_path)
+        # print("Loading neuralcoref model from", model_path)
         self.coref_model = Model(model_path)
         self.embed_extractor = EmbeddingExtractor(model_path, nlp.vocab, conv_dict)
 
@@ -683,13 +688,6 @@ cdef class CorefComponent(object):
         Span.set_extension('is_coref', default=False)
         Span.set_extension('coref_cluster', default=None)
         Span.set_extension('coref_main', default=None)
-
-        # Register attribute on the Token. We'll be overwriting this based on
-        # the matches, so we're only setting a default value, not a getter.
-        # If no default value is set, it defaults to None.
-        # Token.set_extension('in_coref', default=False)
-        # Token.set_extension('coref_clusters')
-        # Token.set_extension('coref_mentions', getter=self.coref_clusters)
 
     def __call__(self, doc):
         """Apply the pipeline component on a Doc object and modify it if matches
@@ -787,56 +785,67 @@ cdef class CorefComponent(object):
         p_inp = p_inp_arr
         clock_gettime(CLOCK_REALTIME, &ts)
         curr_t1 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
-        # print("n_mentions", n_mentions)
-        # print("mentions", mentions)
+        #print("n_mentions", n_mentions)
+        #print("mentions", mentions)
 
         # ''' Build single features and pair features arrays '''
         # print("Build single features")
         doc_c = doc.c
-        doc_embedding = self.embed_extractor.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
+        doc_embedding = numpy.zeros(SIZE_EMBEDDING, dtype='float32')# self.embed_extractor.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
         doc_embed = doc_embedding
         # print("Build mentions features")
         for i in range(n_mentions):
-            # print("Get embed for mention", i)
+            #print("Get embed for mention", i)
             # struct_print(c[i], doc.vocab.strings)
-            embeddings = (<EmbeddingExtractor>self.embed_extractor).get_mention_embeddings(doc.c, c[i], self.hashes.puncts)#, doc_embed)
+            embeddings = (<EmbeddingExtractor>self.embed_extractor).get_mention_embeddings(doc.c, c[i], self.hashes.puncts, doc.vocab.strings, doc_embed)
             embed = embeddings
             # print("Prepare array for mention", i)
             s_inp[:SGNL_FEATS_0, i] = embed
-            s_inp[SGNL_FEATS_0 + c[i].mention_type, i] = 1
-            b_idx, val = index_distance(c[i].span_end - c[i].span_start - 1)
+            s_inp[SGNL_FEATS_0 + c[i].mention_type, i] = 1 # 01_MentionType
+            b_idx, val = index_distance(c[i].span_end - c[i].span_start - 1) # 02_MentionLength
             s_inp[SGNL_FEATS_1 + b_idx, i] = 1
             s_inp[SGNL_FEATS_2, i] = val
-            val = float(i)/float(n_mentions)
+            val = float(i)/float(n_mentions) # 03_MentionNormLocation
             s_inp[SGNL_FEATS_3, i] = val
-            s_inp[SGNL_FEATS_4, i] = is_nested(c, n_mentions, i)
+            s_inp[SGNL_FEATS_4, i] = is_nested(c, n_mentions, i) # 04_IsMentionNested
+            #print('features:', numpy.array(s_inp[SGNL_FEATS_0:SGNL_FEATS_1]), "\n",
+            #      numpy.array(s_inp[SGNL_FEATS_1:SGNL_FEATS_2]), "\n",
+            #      numpy.array(s_inp[SGNL_FEATS_2:SGNL_FEATS_3]), "\n",
+            #      numpy.array(s_inp[SGNL_FEATS_3:SGNL_FEATS_4]), "\n",
+            #      numpy.array(s_inp[SGNL_FEATS_4:SGNL_FEATS_5]))
         clock_gettime(CLOCK_REALTIME, &ts)
         curr_t2 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
         # print("Build pair features")
+        #this = 0
         for i in range(n_pairs):
             ant_idx = p_ant[i]
             men_idx = p_men[i]
+            #if ant_idx == 1 and men_idx == 6:
+            #    this = i
+            #    print("this", i)
             m1 = c[ant_idx]
             m2 = c[men_idx]
             p_inp[:PAIR_FEATS_0, i] = s_inp[:SGNL_FEATS_0, ant_idx]
             p_inp[PAIR_FEATS_0:PAIR_FEATS_1, i] = s_inp[:SGNL_FEATS_0, men_idx]
-            p_inp[PAIR_FEATS_1, i] = 1
-            # p_inp[PAIR_FEATS_1 + 1, i] = 0 # arrays are initialized to zero
-            # p_inp[PAIR_FEATS_1 + 2, i] = 0
-            p_inp[PAIR_FEATS_1 + 3, i] = heads_agree(m1, m2)
-            p_inp[PAIR_FEATS_1 + 4, i] = exact_match(m1, m2)
-            p_inp[PAIR_FEATS_1 + 5, i] = relaxed_match(m1, m2)
-            b_idx, val = index_distance(m2.sent_idx - m1.sent_idx)
+            p_inp[PAIR_FEATS_1, i] = 1       # 00_SameSpeaker
+            # p_inp[PAIR_FEATS_1 + 1, i] = 0 # 01_AntMatchMentionSpeaker # arrays are initialized to zero
+            # p_inp[PAIR_FEATS_1 + 2, i] = 0 # 02_MentionMatchSpeaker
+            p_inp[PAIR_FEATS_1 + 3, i] = heads_agree(m1, m2) # 03_HeadsAgree
+            p_inp[PAIR_FEATS_1 + 4, i] = exact_match(m1, m2) # 04_ExactStringMatch
+            p_inp[PAIR_FEATS_1 + 5, i] = relaxed_match(m1, m2) # 05_RelaxedStringMatch
+            b_idx, val = index_distance(m2.sent_idx - m1.sent_idx) # 06_SentenceDistance
             # p_inp[PAIR_FEATS_2:PAIR_FEATS_3, i] = 0
             p_inp[PAIR_FEATS_2 + b_idx, i] = 1
             p_inp[PAIR_FEATS_3, i] = val
-            b_idx, val = index_distance(men_idx - ant_idx - 1)
+            b_idx, val = index_distance(men_idx - ant_idx - 1) # 07_MentionDistance
             # p_inp[PAIR_FEATS_4:PAIR_FEATS_5, i] = 0
             p_inp[PAIR_FEATS_4 + b_idx, i] = 1
             p_inp[PAIR_FEATS_5, i] = val
-            p_inp[PAIR_FEATS_5 + 1, i] = overlapping(m1, m2)
-            p_inp[PAIR_FEATS_6:PAIR_FEATS_7, i] = s_inp[SGNL_FEATS_0:SGNL_FEATS_5, ant_idx]
-            p_inp[PAIR_FEATS_7:PAIR_FEATS_8, i] = s_inp[SGNL_FEATS_0:SGNL_FEATS_5, men_idx]
+            p_inp[PAIR_FEATS_5 + 1, i] = overlapping(m1, m2) # 08_Overlapping
+            p_inp[PAIR_FEATS_6:PAIR_FEATS_7, i] = s_inp[SGNL_FEATS_0:SGNL_FEATS_5, ant_idx] # 09_M1Features
+            p_inp[PAIR_FEATS_7:PAIR_FEATS_8, i] = s_inp[SGNL_FEATS_0:SGNL_FEATS_5, men_idx] # 10_M2Features
+            # 11_DocGenre is zero currently
+        # numpy.save('61_dump', numpy.array(p_inp[:, this]))
         clock_gettime(CLOCK_REALTIME, &ts)
         curr_t3 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
 
@@ -847,6 +856,7 @@ cdef class CorefComponent(object):
         best_score = best_score_ar
         best_ant = best_ant_ar
         score = self.coref_model.get_score(s_inp, single=True)
+        # print('single score:', numpy.array(score))
         for i in range(n_mentions):
             best_score[i] = score[i] - 50 * (self.greedyness - 0.5)
             best_ant[i] = i
@@ -854,11 +864,18 @@ cdef class CorefComponent(object):
         for i in range(n_pairs):
             ant_idx = p_ant[i]
             men_idx = p_men[i]
+            # print("score for", ant_idx, men_idx, score[i])
             if score[i] > best_score[men_idx]:
                 best_score[men_idx] = score[i]
                 best_ant[men_idx] = ant_idx
+        # print('pair score:', numpy.array(score))
         clock_gettime(CLOCK_REALTIME, &ts)
         curr_t4 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
+
+        # for i in range(n_pairs):
+        #    ant_idx = p_ant[i]
+        #    men_idx = p_men[i]
+        #    print("pair features for", ant_idx, men_idx, numpy.array(p_inp[PAIR_FEATS_1:, i]))
 
         # print("Build clusters")
         # ''' Build clusters '''
@@ -907,6 +924,7 @@ cdef class CorefComponent(object):
                     mention._.set('coref_main', main)
         clock_gettime(CLOCK_REALTIME, &ts)
         curr_t6 = ts.tv_sec + (ts.tv_nsec / 1000000000.) - curr_t0
+        print("mentions", mentions)
         print("timing",
               "\nExtract mentions and Prepare arrays", <object>curr_t1,
               "\nBuild single features", <object>curr_t2,
@@ -916,15 +934,15 @@ cdef class CorefComponent(object):
               "\nUpdate doc", <object>curr_t6)
         return doc
 
-#cdef struct_print(Mention_C mention, StringStore strings):
-#    print("== span_lower", <object>strings[mention.span_lower])
-#    print("entity_label", <object>mention.entity_label)
-#    print("span_root", <object>mention.span_root)
-#    print("span_start", <object>mention.span_start)
-#    print("span_end", <object>mention.span_end)
-#    print("sent_idx", <object>mention.sent_idx)
-#    print("sent_start", <object>mention.sent_start)
-#    print("sent_end", <object>mention.sent_end)
-#    print("mention_type", <object>mention.mention_type)
-#    print("root_lower", <object>strings[mention.root_lower])
-#    print("- content_words --")
+cdef struct_print(Mention_C mention, StringStore strings):
+    print("== span_lower", <object>strings[mention.span_lower])
+    print("entity_label", <object>mention.entity_label)
+    print("span_root", <object>mention.span_root)
+    print("span_start", <object>mention.span_start)
+    print("span_end", <object>mention.span_end)
+    print("sent_idx", <object>mention.sent_idx)
+    print("sent_start", <object>mention.sent_start)
+    print("sent_end", <object>mention.sent_end)
+    print("mention_type", <object>mention.mention_type)
+    print("root_lower", <object>strings[mention.root_lower])
+    print("- content_words --")
