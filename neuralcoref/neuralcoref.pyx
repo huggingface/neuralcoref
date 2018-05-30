@@ -732,33 +732,19 @@ cdef class NeuralCoref(object):
         cdef int head = m.span_root + doc[m.span_root].head
         embeddings = numpy.zeros((EMBED_13, ), dtype='float32')
         embed = embeddings
-        print("prout")
         embeddings[        :EMBED_01] = self.get_average_embedding(doc, m.span_start, m.span_end, puncts)
-        print("prout")
         embeddings[EMBED_01:EMBED_02] = self.get_average_embedding(doc, max(m.span_start-5, m.sent_start), m.span_start, puncts)
-        print("prout")
         embeddings[EMBED_02:EMBED_03] = self.get_average_embedding(doc, m.span_end, min(m.span_end + 5, m.sent_end), puncts)
-        print("prout")
         embeddings[EMBED_03:EMBED_04] = self.get_average_embedding(doc, m.sent_start, m.sent_end, puncts)
-        print("prout")
         embeddings[EMBED_04:EMBED_05] = doc_embedding
-        print("prout")
         embeddings[EMBED_05:EMBED_06] = self.get_word_embedding(doc[m.span_root].lex)
-        print("prout")
         embeddings[EMBED_06:EMBED_07] = self.get_word_embedding(doc[m.span_start].lex)
-        print("prout")
         embeddings[EMBED_07:EMBED_08] = self.get_word_embedding(doc[m.span_end-1].lex)
-        print("prout")
         embeddings[EMBED_08:EMBED_09] = self.get_word_in_sentence(m.span_start-1, doc, m.sent_start, m.sent_end)
-        print("prout")
         embeddings[EMBED_09:EMBED_10] = self.get_word_in_sentence(m.span_end, doc, m.sent_start, m.sent_end)
-        print("prout")
         embeddings[EMBED_10:EMBED_11] = self.get_word_in_sentence(m.span_start-2, doc, m.sent_start, m.sent_end)
-        print("prout")
         embeddings[EMBED_11:EMBED_12] = self.get_word_in_sentence(m.span_end+1, doc, m.sent_start, m.sent_end)
-        print("prout")
         embeddings[EMBED_12:        ] = self.get_word_embedding(doc[head].lex)
-        print("prout")
         return embeddings
 
     def to_disk(self, path, **exclude):
