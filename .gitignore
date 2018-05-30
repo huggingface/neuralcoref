@@ -24,7 +24,8 @@ __pycache__/
 /include/
 /lib/
 /pip-selfcheck.json
-/runs/*
+/neuralcoref/train/runs/*
+/spacy_model/
 test_corefs.txt
 test_mentions.txt
 .cache
