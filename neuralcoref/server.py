@@ -22,7 +22,7 @@ class CorefWrapper(Coref):
     def run_coref(self):
         self.run_coref_on_utterances(last_utterances_added=True, follow_chains=True)
         coreferences = self.get_most_representative(use_no_coref_list=False)
-
+        
         json_mentions = [{'index':          mention.index,
                           'start':          mention.start_char,
                           'end':            mention.end_char,
@@ -46,8 +46,7 @@ class AllResource(object):
 
     def on_get(self, req, resp):
         self.response = {}
-
-        text_param = req.get_param("text")
+        text_param = req.get_param_as_list("text")
         if text_param is not None:
             text = ",".join(text_param) if isinstance(text_param, list) else text_param
             text = unicode_(text)
@@ -58,8 +57,8 @@ class AllResource(object):
             text_speaker = req.get_param("textspeaker")
             context_speakers = req.get_param_as_list("contextspeakers")
             speakers_names = req.get_param_as_dict("speakersnames")
-            print("text", text)
-            print("context", context)
+            print ("text",text)
+            print ("context",context)
             self.coref.parse_and_get_mentions(text, text_speaker,
                                               context, context_speakers,
                                               speakers_names)
