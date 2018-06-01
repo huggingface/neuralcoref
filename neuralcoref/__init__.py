@@ -1,1 +1,0 @@
-from .algorithm import Coref

@@ -496,12 +496,21 @@ cdef class NeuralCoref(object):
     def set_conv_dict(self, conv_dict):
         self.conv_dict = Vectors()
         for key, words in conv_dict.items():
-            norm_k = self.normalize(self.vocab.get(key, self.vocab.mem))
-            norm_w = list(self.normalize(self.vocab.get(w, self.vocab.mem)) for w in words)
+            norm_k = self.normalize(key)
+            norm_w = list(self.normalize(w) for w in words)
             embed_vector = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
             for hash_w in norm_w:
                 embed_vector += self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
             self.conv_dict.add(key=norm_k, vector=embed_vector/max(len(norm_w), 1))
+    # def set_conv_dict(self, conv_dict):
+    #     self.conv_dict = Vectors()
+    #     for key, words in conv_dict.items():
+    #         norm_k = self.normalize(self.vocab.get(key, self.vocab.mem))
+    #         norm_w = list(self.normalize(self.vocab.get(w, self.vocab.mem)) for w in words)
+    #         embed_vector = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
+    #         for hash_w in norm_w:
+    #             embed_vector += self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
+    #         self.conv_dict.add(key=norm_k, vector=embed_vector/max(len(norm_w), 1))
 
     def pipe(self, docs, int batch_size=256, int n_threads=2,
              float greedyness=0.5, int max_dist=50, int max_dist_match=500,
@@ -524,9 +533,9 @@ cdef class NeuralCoref(object):
             TokenC* doc_c
             uint64_t i, ant_idx, men_idx, b_idx, n_mentions, n_pairs
             uint64_t [::1] p_ant, p_men, best_ant
-            float [::1] embed, feats, doc_embed, mention_embed
+            float [::1] embed, feats, doc_embed, mention_embed, best_score
             float [:, ::1] s_inp, p_inp
-            float [::1] score, best_score
+            float [:, ::1] score
             Pool mem = Pool() # We use this for doc specific allocation
         strings = doc.vocab.strings
         # ''' Extract mentions '''
@@ -552,8 +561,9 @@ cdef class NeuralCoref(object):
             c[i].content_words.arr = <hash_t*>mem.alloc(len(content_words[-1]), sizeof(hash_t))
             for j, w in enumerate(content_words[-1]):
                 c[i].content_words.arr[j] = strings.add(w)
+
         # ''' Prepare arrays of pairs indices and features for feeding the model '''
-        print("Prepare arrays")
+        # print("Prepare arrays")
         pairs_ant = []
         pairs_men = []
         n_pairs = 0
@@ -587,28 +597,24 @@ cdef class NeuralCoref(object):
         s_inp = s_inp_arr
         p_inp_arr = numpy.zeros((n_pairs, SIZE_PAIR_IN_NO_GENRE + SIZE_GENRE), dtype='float32')
         p_inp = p_inp_arr
+
         # ''' Build single features and pair features arrays '''
-        print("Build single features")
-        print(n_mentions)
-        print(mentions)
+        # print("Build single features")
+        # print(n_mentions)
+        # print(mentions)
         doc_c = doc.c
         doc_embedding = numpy.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
         doc_embed = doc_embedding
         for i in range(n_mentions):
-            print("feats", i, mentions[i])
-            a = self.get_mention_embeddings(doc.c, c[i], self.hashes.puncts, doc_embedding)
-            mention_embed = a
-            #print("a shape", a.shape, SGNL_FEATS_0, s_inp[i, :SGNL_FEATS_0].shape)
-            s_inp[i, :SGNL_FEATS_0] = mention_embed # Set embeddings
-            print("mention ok")
-            s_inp[i, SGNL_FEATS_0 + c[i].mention_type] = 1                      # 01_MentionType
+            s_inp_arr[i, :SGNL_FEATS_0] = self.get_mention_embeddings(mentions[i], doc_embedding) # Set embeddings
+            s_inp_arr[i, SGNL_FEATS_0 + c[i].mention_type] = 1                      # 01_MentionType
             b_idx, val = index_distance(c[i].span_end - c[i].span_start - 1)    # 02_MentionLength
-            s_inp[i, SGNL_FEATS_1 + b_idx] = 1
-            s_inp[i, SGNL_FEATS_2] = val
+            s_inp_arr[i, SGNL_FEATS_1 + b_idx] = 1
+            s_inp_arr[i, SGNL_FEATS_2] = val
             val = float(i)/float(n_mentions)                                    # 03_MentionNormLocation
-            s_inp[i, SGNL_FEATS_3] = val
-            s_inp[i, SGNL_FEATS_4] = is_nested(c, n_mentions, i)                # 04_IsMentionNested
-        print("Build pair features")
+            s_inp_arr[i, SGNL_FEATS_3] = val
+            s_inp_arr[i, SGNL_FEATS_4] = is_nested(c, n_mentions, i)                # 04_IsMentionNested
+        # print("Build pair features")
         for i in range(n_pairs):
             ant_idx = p_ant[i]
             men_idx = p_men[i]
@@ -634,22 +640,23 @@ cdef class NeuralCoref(object):
             p_inp[i, PAIR_FEATS_6:PAIR_FEATS_7] = s_inp[ant_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 09_M1Features
             p_inp[i, PAIR_FEATS_7:PAIR_FEATS_8] = s_inp[men_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 10_M2Features
             # 11_DocGenre is zero currently
+
         # ''' Compute scores '''
-        print("Compute scores")
+        # print("Compute scores")
         best_score_ar = numpy.empty((n_mentions), dtype='float32')
         best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
         best_score = best_score_ar
         best_ant = best_ant_ar
-        score = self.model[0](s_inp)
+        score = self.model[0](s_inp_arr)
         for i in range(n_mentions):
-            best_score[i] = score[i] - 50 * (greedyness - 0.5)
+            best_score[i] = score[i, 0] - 50 * (greedyness - 0.5)
             best_ant[i] = i
-        score = self.model[1](p_inp)
+        score = self.model[1](p_inp_arr)
         for i in range(n_pairs):
             ant_idx = p_ant[i]
             men_idx = p_men[i]
-            if score[i] > best_score[men_idx]:
-                best_score[men_idx] = score[i]
+            if score[i, 0] > best_score[men_idx]:
+                best_score[men_idx] = score[i, 0]
                 best_ant[men_idx] = ant_idx
         # ''' Build clusters '''
         mention_to_cluster = list(range(n_mentions))
@@ -693,58 +700,55 @@ cdef class NeuralCoref(object):
                     mention._.set('coref_main', main)
         return doc
 
-    cdef hash_t normalize(self, const LexemeC* c):
-        return self.hashes.digit_word if Lexeme.c_check_flag(c, IS_DIGIT) else c.lower
+    def normalize(self, Token token):
+        return self.hashes.digit_word if token.is_digit else token.lower
 
     def get_static(self, hash_t word):
         return self.static_vectors[word] if word in self.static_vectors else self.static_vectors[self.hashes.unknown_word]
 
-    def get_word_embedding(self, const LexemeC* c, bint tuned=True):
-        hash_w = self.normalize(c)
+    def get_word_embedding(self, Token token, bint tuned=True):
+        hash_w = self.normalize(token)
         if self.conv_dict is not None and hash_w in self.conv_dict:
             return self.conv_dict[hash_w]
         if tuned and hash_w in self.tuned_vectors:
             return self.tuned_vectors[hash_w]
         return self.get_static(hash_w)
  
-    def get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end):
-        if word_idx < sent_start or word_idx >= sent_end:
+    def get_word_in_sentence(self, int i, Span sent):
+        if i < sent.start or i >= sent.end:
             return self.tuned_vectors[self.hashes.missing_word]
-        return self.get_word_embedding(doc[word_idx].lex)
+        return self.get_word_embedding(sent.doc[i])
 
-    def get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts):
+    def get_average_embedding(self, Span span):
         cdef int i
         cdef int n = 0
-        a = <object>start
-        b = <object>end
-        print(a, b)
         embed_arr = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
-        for i in range(start, end):
-            if not inside(doc[i].lex.lower, puncts):
+        for token in span:
+            if token.lower not in PUNCTS:
                 n += 1
-                embed_vector = self.get_word_embedding(doc[i].lex, tuned=False)
+                embed_vector = self.get_word_embedding(token, tuned=False)
                 embed_arr = embed_arr + embed_vector
         embed_arr = numpy.divide(embed_arr, float(max(n, 1)))
         return embed_arr
 
-    def get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts, doc_embedding):
+    def get_mention_embeddings(self, Span span, doc_embedding):
         ''' Set span (averaged) and word (single) embeddings of a mention '''
-        cdef int head = m.span_root + doc[m.span_root].head
+        doc = span.doc
+        sent = span.sent
         embeddings = numpy.zeros((EMBED_13, ), dtype='float32')
-        embed = embeddings
-        embeddings[        :EMBED_01] = self.get_average_embedding(doc, m.span_start, m.span_end, puncts)
-        embeddings[EMBED_01:EMBED_02] = self.get_average_embedding(doc, max(m.span_start-5, m.sent_start), m.span_start, puncts)
-        embeddings[EMBED_02:EMBED_03] = self.get_average_embedding(doc, m.span_end, min(m.span_end + 5, m.sent_end), puncts)
-        embeddings[EMBED_03:EMBED_04] = self.get_average_embedding(doc, m.sent_start, m.sent_end, puncts)
+        embeddings[        :EMBED_01] = self.get_average_embedding(span)
+        embeddings[EMBED_01:EMBED_02] = self.get_average_embedding(doc[max(span.start-5, sent.start):span.start])
+        embeddings[EMBED_02:EMBED_03] = self.get_average_embedding(doc[span.end:min(span.end + 5, sent.end)])
+        embeddings[EMBED_03:EMBED_04] = self.get_average_embedding(sent)
         embeddings[EMBED_04:EMBED_05] = doc_embedding
-        embeddings[EMBED_05:EMBED_06] = self.get_word_embedding(doc[m.span_root].lex)
-        embeddings[EMBED_06:EMBED_07] = self.get_word_embedding(doc[m.span_start].lex)
-        embeddings[EMBED_07:EMBED_08] = self.get_word_embedding(doc[m.span_end-1].lex)
-        embeddings[EMBED_08:EMBED_09] = self.get_word_in_sentence(m.span_start-1, doc, m.sent_start, m.sent_end)
-        embeddings[EMBED_09:EMBED_10] = self.get_word_in_sentence(m.span_end, doc, m.sent_start, m.sent_end)
-        embeddings[EMBED_10:EMBED_11] = self.get_word_in_sentence(m.span_start-2, doc, m.sent_start, m.sent_end)
-        embeddings[EMBED_11:EMBED_12] = self.get_word_in_sentence(m.span_end+1, doc, m.sent_start, m.sent_end)
-        embeddings[EMBED_12:        ] = self.get_word_embedding(doc[head].lex)
+        embeddings[EMBED_05:EMBED_06] = self.get_word_embedding(span.root)
+        embeddings[EMBED_06:EMBED_07] = self.get_word_embedding(span[0])
+        embeddings[EMBED_07:EMBED_08] = self.get_word_embedding(span[-1])
+        embeddings[EMBED_08:EMBED_09] = self.get_word_in_sentence(span.start-1, sent)
+        embeddings[EMBED_09:EMBED_10] = self.get_word_in_sentence(span.end, sent)
+        embeddings[EMBED_10:EMBED_11] = self.get_word_in_sentence(span.start-2, sent)
+        embeddings[EMBED_11:EMBED_12] = self.get_word_in_sentence(span.end+1, sent)
+        embeddings[EMBED_12:        ] = self.get_word_embedding(span.root.head)
         return embeddings
 
     def to_disk(self, path, **exclude):
@@ -820,3 +824,58 @@ cdef class NeuralCoref(object):
                 self.model[1].from_bytes(msg['pairs_model'])
             self.cfg.update(cfg)
         return self
+
+
+
+###################
+###################
+
+    # cpdef hash_t normalize(self, const LexemeC* c):
+    #     return self.hashes.digit_word if Lexeme.c_check_flag(c, IS_DIGIT) else c.lower
+
+    # cpdef get_static(self, hash_t word):
+    #     return self.static_vectors[word] if word in self.static_vectors else self.static_vectors[self.hashes.unknown_word]
+
+    # cpdef get_word_embedding(self, const LexemeC* c, bint tuned=True):
+    #     hash_w = self.normalize(c)
+    #     if self.conv_dict is not None and hash_w in self.conv_dict:
+    #         return self.conv_dict[hash_w]
+    #     if tuned and hash_w in self.tuned_vectors:
+    #         return self.tuned_vectors[hash_w]
+    #     return self.get_static(hash_w)
+ 
+    # cpdef get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end):
+    #     if word_idx < sent_start or word_idx >= sent_end:
+    #         return self.tuned_vectors[self.hashes.missing_word]
+    #     return self.get_word_embedding(doc[word_idx].lex)
+
+    # cpdef get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts):
+    #     cdef int i
+    #     cdef int n = 0
+    #     embed_arr = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
+    #     for i in range(start, end):
+    #         if not inside(doc[i].lex.lower, puncts):
+    #             n += 1
+    #             embed_vector = self.get_word_embedding(doc[i].lex, tuned=False)
+    #             embed_arr = embed_arr + embed_vector
+    #     embed_arr = numpy.divide(embed_arr, float(max(n, 1)))
+    #     return embed_arr
+
+    # cpdef get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts, doc_embedding):
+    #     ''' Set span (averaged) and word (single) embeddings of a mention '''
+    #     cdef int head = m.span_root + doc[m.span_root].head
+    #     embeddings = numpy.zeros((EMBED_13, ), dtype='float32')
+    #     embeddings[        :EMBED_01] = self.get_average_embedding(doc, m.span_start, m.span_end, puncts)
+    #     embeddings[EMBED_01:EMBED_02] = self.get_average_embedding(doc, max(m.span_start-5, m.sent_start), m.span_start, puncts)
+    #     embeddings[EMBED_02:EMBED_03] = self.get_average_embedding(doc, m.span_end, min(m.span_end + 5, m.sent_end), puncts)
+    #     embeddings[EMBED_03:EMBED_04] = self.get_average_embedding(doc, m.sent_start, m.sent_end, puncts)
+    #     embeddings[EMBED_04:EMBED_05] = doc_embedding
+    #     embeddings[EMBED_05:EMBED_06] = self.get_word_embedding(doc[m.span_root].lex)
+    #     embeddings[EMBED_06:EMBED_07] = self.get_word_embedding(doc[m.span_start].lex)
+    #     embeddings[EMBED_07:EMBED_08] = self.get_word_embedding(doc[m.span_end-1].lex)
+    #     embeddings[EMBED_08:EMBED_09] = self.get_word_in_sentence(m.span_start-1, doc, m.sent_start, m.sent_end)
+    #     embeddings[EMBED_09:EMBED_10] = self.get_word_in_sentence(m.span_end, doc, m.sent_start, m.sent_end)
+    #     embeddings[EMBED_10:EMBED_11] = self.get_word_in_sentence(m.span_start-2, doc, m.sent_start, m.sent_end)
+    #     embeddings[EMBED_11:EMBED_12] = self.get_word_in_sentence(m.span_end+1, doc, m.sent_start, m.sent_end)
+    #     embeddings[EMBED_12:        ] = self.get_word_embedding(doc[head].lex)
+    #     return embeddings

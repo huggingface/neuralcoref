@@ -64,9 +64,9 @@ cdef class NeuralCoref(object):
     cdef public object conv_dict
 
 #    cdef build_clusters(self, Doc doc)
-    cdef hash_t normalize(self, const LexemeC* c)
-    cdef float [::1] get_static(self, hash_t word)
-    cdef float [::1] get_word_embedding(self, const LexemeC* c, bint tuned=*)
-    cdef float [::1] get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end)
-    cdef float [::1] get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts)
-    cdef float [::1] get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts, float [::1] doc_embedding) #, float [::1] mention_embed)
+    # cdef hash_t normalize(self, const LexemeC* c)
+    # cpdef get_static(self, hash_t word)
+    # cpdef get_word_embedding(self, const LexemeC* c, bint tuned=*)
+    # cpdef get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end)
+    # cpdef get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts)
+    # cpdef get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts, doc_embedding) #, float [::1] mention_embed)
