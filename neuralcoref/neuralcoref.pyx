@@ -6,6 +6,7 @@ Custom pipeline components: https://spacy.io//usage/processing-pipelines#custom-
 Compatible with: spaCy v2.0.0+
 """
 from __future__ import unicode_literals, print_function
+from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
 
 import plac
 import re
@@ -537,6 +538,13 @@ cdef class NeuralCoref(object):
             float [:, ::1] s_inp, p_inp
             float [:, ::1] score
             Pool mem = Pool() # We use this for doc specific allocation
+
+            timespec ts
+            double timing0, timing1, timing2, timing3, timing4, timing5
+
+        clock_gettime(CLOCK_REALTIME, &ts)
+        timing0 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+
         strings = doc.vocab.strings
         # ''' Extract mentions '''
         mentions, n_mentions = extract_mentions_spans(doc, self.hashes, blacklist=blacklist)
@@ -598,6 +606,9 @@ cdef class NeuralCoref(object):
         p_inp_arr = numpy.zeros((n_pairs, SIZE_PAIR_IN_NO_GENRE + SIZE_GENRE), dtype='float32')
         p_inp = p_inp_arr
 
+        clock_gettime(CLOCK_REALTIME, &ts)
+        timing1 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+
         # ''' Build single features and pair features arrays '''
         # print("Build single features")
         # print(n_mentions)
@@ -614,6 +625,10 @@ cdef class NeuralCoref(object):
             val = float(i)/float(n_mentions)                                    # 03_MentionNormLocation
             s_inp_arr[i, SGNL_FEATS_3] = val
             s_inp_arr[i, SGNL_FEATS_4] = is_nested(c, n_mentions, i)                # 04_IsMentionNested
+
+        clock_gettime(CLOCK_REALTIME, &ts)
+        timing2 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+
         # print("Build pair features")
         for i in range(n_pairs):
             ant_idx = p_ant[i]
@@ -641,6 +656,9 @@ cdef class NeuralCoref(object):
             p_inp[i, PAIR_FEATS_7:PAIR_FEATS_8] = s_inp[men_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 10_M2Features
             # 11_DocGenre is zero currently
 
+        clock_gettime(CLOCK_REALTIME, &ts)
+        timing3 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+
         # ''' Compute scores '''
         # print("Compute scores")
         best_score_ar = numpy.empty((n_mentions), dtype='float32')
@@ -658,6 +676,10 @@ cdef class NeuralCoref(object):
             if score[i, 0] > best_score[men_idx]:
                 best_score[men_idx] = score[i, 0]
                 best_ant[men_idx] = ant_idx
+
+        clock_gettime(CLOCK_REALTIME, &ts)
+        timing4 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+
         # ''' Build clusters '''
         mention_to_cluster = list(range(n_mentions))
         cluster_to_main = list(range(n_mentions))
@@ -687,6 +709,7 @@ cdef class NeuralCoref(object):
                 main = mentions[cluster_to_main[key]]
                 mentions_list += m_list
                 clusters_list[main] = m_list
+
         # ''' Update doc '''
         if len(clusters) != 0:
             doc._.set('has_coref', True)
@@ -698,6 +721,18 @@ cdef class NeuralCoref(object):
                     mention._.set('is_coref', True)
                     mention._.set('coref_cluster', m_list)
                     mention._.set('coref_main', main)
+        clock_gettime(CLOCK_REALTIME, &ts)
+        timing5 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+
+        print("Timings")
+        print("prepare mentions", timing1 - timing0)
+        print("single features arrays", timing2 - timing1)
+        print("pair features arrays", timing3 - timing2)
+        print("scores", timing4 - timing3)
+        print("final stuffs", timing5 - timing4)
+        print("total", timing5 - timing0)
+        print("length", len(doc))
+
         return doc
 
     def normalize(self, Token token):

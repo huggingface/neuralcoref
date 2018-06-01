@@ -11,4 +11,4 @@ coref.from_disk(disk_model_path)
 text = u"I know that Barbara and Sandy are here. I see Barbara watching TV. I hear Sandy breathing."
 print("=!=" + text)
 doc3 = nlp(text)
-coref(doc3)
+doc4 = coref(doc3)
