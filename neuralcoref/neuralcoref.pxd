@@ -4,7 +4,6 @@ from spacy.typedefs cimport flags_t, attr_t, hash_t
 from spacy.vectors import Vectors
 from spacy.vocab cimport Vocab
 from spacy.structs cimport TokenC, LexemeC
-cimport numpy as np
 from cymem.cymem cimport Pool
 
 cdef struct SpanC:
@@ -62,11 +61,3 @@ cdef class NeuralCoref(object):
     cdef public object static_vectors
     cdef public object tuned_vectors
     cdef public object conv_dict
-
-#    cdef build_clusters(self, Doc doc)
-    # cdef hash_t normalize(self, const LexemeC* c)
-    # cpdef get_static(self, hash_t word)
-    # cpdef get_word_embedding(self, const LexemeC* c, bint tuned=*)
-    # cpdef get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end)
-    # cpdef get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts)
-    # cpdef get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts, doc_embedding) #, float [::1] mention_embed)

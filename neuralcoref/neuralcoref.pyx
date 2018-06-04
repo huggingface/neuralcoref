@@ -6,7 +6,7 @@ Custom pipeline components: https://spacy.io//usage/processing-pipelines#custom-
 Compatible with: spaCy v2.0.0+
 """
 from __future__ import unicode_literals, print_function
-from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
+# from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
 
 import plac
 import re
@@ -19,8 +19,6 @@ from cpython cimport array
 import array
 from libc.stdint cimport uint16_t, uint32_t, uint64_t, uintptr_t, int32_t
 
-cimport numpy as np
-np.import_array()
 import numpy
 from cymem.cymem cimport Pool
 import spacy
@@ -41,6 +39,7 @@ from spacy import util
 
 from thinc.v2v import Model, ReLu, Affine
 from thinc.api import chain, clone
+# from thinc.neural.util import get_array_module
 
 ##############################
 ##### A BUNCH OF SIZES #######
@@ -258,10 +257,10 @@ cdef get_span_type(Span span):
         mention_type = MENTION_TYPE["NOMINAL"]
     return mention_type
 
-def get_resolved(doc, coreferences):
+def get_resolved(doc, clusters_list, main_mentions_list):
     ''' Return a list of utterrances text where the coref are resolved to the most representative mention'''
     resolved = list(tok.text_with_ws for tok in doc)
-    for main, cluster in coreferences.items():
+    for main, cluster in zip(main_mentions_list, clusters_list):
         for coref in cluster:
             if coref != main:
                 resolved[coref.start] = main.text + doc[coref.end-1].whitespace_
@@ -466,11 +465,11 @@ cdef class NeuralCoref(object):
         Doc.set_extension('has_coref', default=False)
         Doc.set_extension('coref_mentions', default=None)
         Doc.set_extension('coref_clusters', default=None)
+        Doc.set_extension('coref_main_mentions', default=None)
         Doc.set_extension('coref_resolved', default="")
         Span.set_extension('is_coref', default=False)
         Span.set_extension('coref_cluster', default=None)
-        Span.set_extension('coref_main', default=None)
-        print("Init finished")
+        Span.set_extension('coref_main_mention', default=None)
 
     def __reduce__(self):
         return (NeuralCoref, (self.vocab, self.model), None, None)
@@ -490,7 +489,6 @@ cdef class NeuralCoref(object):
             blacklist = self.cfg.get('blacklist', False)
         if conv_dict is not None:
             self.set_conv_dict(conv_dict)
-        print("Calling build clusters")
         return self.build_clusters(doc, greedyness=greedyness, max_dist=max_dist,
                             max_dist_match=max_dist_match, blacklist=blacklist)
 
@@ -503,15 +501,6 @@ cdef class NeuralCoref(object):
             for hash_w in norm_w:
                 embed_vector += self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
             self.conv_dict.add(key=norm_k, vector=embed_vector/max(len(norm_w), 1))
-    # def set_conv_dict(self, conv_dict):
-    #     self.conv_dict = Vectors()
-    #     for key, words in conv_dict.items():
-    #         norm_k = self.normalize(self.vocab.get(key, self.vocab.mem))
-    #         norm_w = list(self.normalize(self.vocab.get(w, self.vocab.mem)) for w in words)
-    #         embed_vector = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
-    #         for hash_w in norm_w:
-    #             embed_vector += self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
-    #         self.conv_dict.add(key=norm_k, vector=embed_vector/max(len(norm_w), 1))
 
     def pipe(self, docs, int batch_size=256, int n_threads=2,
              float greedyness=0.5, int max_dist=50, int max_dist_match=500,
@@ -539,11 +528,11 @@ cdef class NeuralCoref(object):
             float [:, ::1] score
             Pool mem = Pool() # We use this for doc specific allocation
 
-            timespec ts
-            double timing0, timing1, timing2, timing3, timing4, timing5
+        #    timespec ts
+        #    double timing0, timing1, timing2, timing3, timing4, timing5
 
-        clock_gettime(CLOCK_REALTIME, &ts)
-        timing0 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+        # clock_gettime(CLOCK_REALTIME, &ts)
+        # timing0 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
 
         strings = doc.vocab.strings
         # ''' Extract mentions '''
@@ -606,13 +595,11 @@ cdef class NeuralCoref(object):
         p_inp_arr = numpy.zeros((n_pairs, SIZE_PAIR_IN_NO_GENRE + SIZE_GENRE), dtype='float32')
         p_inp = p_inp_arr
 
-        clock_gettime(CLOCK_REALTIME, &ts)
-        timing1 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+        # clock_gettime(CLOCK_REALTIME, &ts)
+        # timing1 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
 
         # ''' Build single features and pair features arrays '''
-        # print("Build single features")
-        # print(n_mentions)
-        # print(mentions)
+        # print("Build single features", n_mentions, mentions)
         doc_c = doc.c
         doc_embedding = numpy.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
         doc_embed = doc_embedding
@@ -626,8 +613,8 @@ cdef class NeuralCoref(object):
             s_inp_arr[i, SGNL_FEATS_3] = val
             s_inp_arr[i, SGNL_FEATS_4] = is_nested(c, n_mentions, i)                # 04_IsMentionNested
 
-        clock_gettime(CLOCK_REALTIME, &ts)
-        timing2 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+        # clock_gettime(CLOCK_REALTIME, &ts)
+        # timing2 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
 
         # print("Build pair features")
         for i in range(n_pairs):
@@ -656,8 +643,8 @@ cdef class NeuralCoref(object):
             p_inp[i, PAIR_FEATS_7:PAIR_FEATS_8] = s_inp[men_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 10_M2Features
             # 11_DocGenre is zero currently
 
-        clock_gettime(CLOCK_REALTIME, &ts)
-        timing3 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+        # clock_gettime(CLOCK_REALTIME, &ts)
+        # timing3 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
 
         # ''' Compute scores '''
         # print("Compute scores")
@@ -677,8 +664,8 @@ cdef class NeuralCoref(object):
                 best_score[men_idx] = score[i, 0]
                 best_ant[men_idx] = ant_idx
 
-        clock_gettime(CLOCK_REALTIME, &ts)
-        timing4 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+        # clock_gettime(CLOCK_REALTIME, &ts)
+        # timing4 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
 
         # ''' Build clusters '''
         mention_to_cluster = list(range(n_mentions))
@@ -702,37 +689,39 @@ cdef class NeuralCoref(object):
         remove_id = []
         main = list(mentions)
         mentions_list = []
-        clusters_list = {}
+        clusters_list = []
+        main_mentions_list = []
         for key, m_idx_list in clusters.items():
             if len(m_idx_list) != 1:
                 m_list = list(mentions[i] for i in m_idx_list)
                 main = mentions[cluster_to_main[key]]
                 mentions_list += m_list
-                clusters_list[main] = m_list
+                clusters_list.append(m_list)
+                main_mentions_list.append(main)
 
         # ''' Update doc '''
         if len(clusters) != 0:
             doc._.set('has_coref', True)
             doc._.set('coref_mentions', mentions_list)
             doc._.set('coref_clusters', clusters_list)
-            doc._.set('coref_resolved', get_resolved(doc, clusters_list))
-            for main, m_list in clusters_list.items():
+            doc._.set('coref_main_mentions', main_mentions_list)
+            doc._.set('coref_resolved', get_resolved(doc, clusters_list, main_mentions_list))
+            for main, m_list in zip(main_mentions_list, clusters_list):
                 for mention in m_list:
                     mention._.set('is_coref', True)
                     mention._.set('coref_cluster', m_list)
-                    mention._.set('coref_main', main)
-        clock_gettime(CLOCK_REALTIME, &ts)
-        timing5 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+                    mention._.set('coref_main_mention', main)
+        # clock_gettime(CLOCK_REALTIME, &ts)
+        # timing5 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
 
-        print("Timings")
-        print("prepare mentions", timing1 - timing0)
-        print("single features arrays", timing2 - timing1)
-        print("pair features arrays", timing3 - timing2)
-        print("scores", timing4 - timing3)
-        print("final stuffs", timing5 - timing4)
-        print("total", timing5 - timing0)
-        print("length", len(doc))
-
+        # print("Timings")
+        # print("prepare mentions", timing1 - timing0)
+        # print("single features arrays", timing2 - timing1)
+        # print("pair features arrays", timing3 - timing2)
+        # print("scores", timing4 - timing3)
+        # print("final stuffs", timing5 - timing4)
+        # print("total", timing5 - timing0)
+        # print("length", len(doc))
         return doc
 
     def normalize(self, Token token):
@@ -790,8 +779,8 @@ cdef class NeuralCoref(object):
         serializers = {
             'single_model': lambda p: p.open('wb').write(self.model[0].to_bytes()),
             'pairs_model': lambda p: p.open('wb').write(self.model[1].to_bytes()),
-            'static_vectors': lambda p: self.static_vectors.to_disk(p / 'static_vectors'),
-            'tuned_vectors': lambda p: self.tuned_vectors.to_disk(p / 'tuned_vectors'),
+            'static_vectors': lambda p: self.static_vectors.to_disk(p),
+            'tuned_vectors': lambda p: self.tuned_vectors.to_disk(p),
             'cfg': lambda p: p.open('w').write(json_dumps(self.cfg))
         }
         util.to_disk(path, serializers, exclude)
@@ -859,58 +848,3 @@ cdef class NeuralCoref(object):
                 self.model[1].from_bytes(msg['pairs_model'])
             self.cfg.update(cfg)
         return self
-
-
-
-###################
-###################
-
-    # cpdef hash_t normalize(self, const LexemeC* c):
-    #     return self.hashes.digit_word if Lexeme.c_check_flag(c, IS_DIGIT) else c.lower
-
-    # cpdef get_static(self, hash_t word):
-    #     return self.static_vectors[word] if word in self.static_vectors else self.static_vectors[self.hashes.unknown_word]
-
-    # cpdef get_word_embedding(self, const LexemeC* c, bint tuned=True):
-    #     hash_w = self.normalize(c)
-    #     if self.conv_dict is not None and hash_w in self.conv_dict:
-    #         return self.conv_dict[hash_w]
-    #     if tuned and hash_w in self.tuned_vectors:
-    #         return self.tuned_vectors[hash_w]
-    #     return self.get_static(hash_w)
- 
-    # cpdef get_word_in_sentence(self, int word_idx, TokenC* doc, int sent_start, int sent_end):
-    #     if word_idx < sent_start or word_idx >= sent_end:
-    #         return self.tuned_vectors[self.hashes.missing_word]
-    #     return self.get_word_embedding(doc[word_idx].lex)
-
-    # cpdef get_average_embedding(self, TokenC* doc, int start, int end, Hashes puncts):
-    #     cdef int i
-    #     cdef int n = 0
-    #     embed_arr = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
-    #     for i in range(start, end):
-    #         if not inside(doc[i].lex.lower, puncts):
-    #             n += 1
-    #             embed_vector = self.get_word_embedding(doc[i].lex, tuned=False)
-    #             embed_arr = embed_arr + embed_vector
-    #     embed_arr = numpy.divide(embed_arr, float(max(n, 1)))
-    #     return embed_arr
-
-    # cpdef get_mention_embeddings(self, TokenC* doc, Mention_C m, Hashes puncts, doc_embedding):
-    #     ''' Set span (averaged) and word (single) embeddings of a mention '''
-    #     cdef int head = m.span_root + doc[m.span_root].head
-    #     embeddings = numpy.zeros((EMBED_13, ), dtype='float32')
-    #     embeddings[        :EMBED_01] = self.get_average_embedding(doc, m.span_start, m.span_end, puncts)
-    #     embeddings[EMBED_01:EMBED_02] = self.get_average_embedding(doc, max(m.span_start-5, m.sent_start), m.span_start, puncts)
-    #     embeddings[EMBED_02:EMBED_03] = self.get_average_embedding(doc, m.span_end, min(m.span_end + 5, m.sent_end), puncts)
-    #     embeddings[EMBED_03:EMBED_04] = self.get_average_embedding(doc, m.sent_start, m.sent_end, puncts)
-    #     embeddings[EMBED_04:EMBED_05] = doc_embedding
-    #     embeddings[EMBED_05:EMBED_06] = self.get_word_embedding(doc[m.span_root].lex)
-    #     embeddings[EMBED_06:EMBED_07] = self.get_word_embedding(doc[m.span_start].lex)
-    #     embeddings[EMBED_07:EMBED_08] = self.get_word_embedding(doc[m.span_end-1].lex)
-    #     embeddings[EMBED_08:EMBED_09] = self.get_word_in_sentence(m.span_start-1, doc, m.sent_start, m.sent_end)
-    #     embeddings[EMBED_09:EMBED_10] = self.get_word_in_sentence(m.span_end, doc, m.sent_start, m.sent_end)
-    #     embeddings[EMBED_10:EMBED_11] = self.get_word_in_sentence(m.span_start-2, doc, m.sent_start, m.sent_end)
-    #     embeddings[EMBED_11:EMBED_12] = self.get_word_in_sentence(m.span_end+1, doc, m.sent_start, m.sent_end)
-    #     embeddings[EMBED_12:        ] = self.get_word_embedding(doc[head].lex)
-    #     return embeddings

@@ -1,2 +1,3 @@
-include neuralcoref/*
-include neuralcoref/weights/*
+recursive-include include *.h
+include LICENSE
+include README.rst

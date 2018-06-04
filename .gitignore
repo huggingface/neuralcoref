@@ -1,33 +1,63 @@
-# Byte-compiled / optimized / DLL files
+# NeuralCoref
+/neuralcoref/train/runs/*
+/models/
+
+# Cython / C extensions
+cythonize.json
+neuralcoref/*.html
+*.cpp
+*.so
+
+# Vim / VSCode / editors
+*.swp
+*.sw*
+Profile.prof
+.vscode
+.sass-cache
+
+# Python
+/.Python
+.python-version
 __pycache__/
 *.py[cod]
+.env/
+.env*
+.~env/
+.venv
+venv/
+.dev
+.denv
+.pypyenv
 
-# C extensions
-*.so
-*.c
-*.cpp
-*.html
+# Temporary files
+*.~*
+tmp/
 
-*.pyc
-*#*
-*.DS_STORE
-*.log
-*Data.fs*
-*flymake*
-dist/*
-*egg*
-urllist*
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Distribution / packaging
+env/
 build/
-__pycache__/
-/.Python
-/bin/
-/include/
-/lib/
-/pip-selfcheck.json
-/neuralcoref/train/runs/*
-/spacy_model/
-test_corefs.txt
-test_mentions.txt
-.cache
-/.vscode/*
-/.vscode
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.eggs
+MANIFEST
+
+# Windows
+*.bat
+Thumbs.db
+Desktop.ini
+
+# Mac OS X
+*.DS_Store

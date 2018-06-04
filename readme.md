@@ -1,11 +1,11 @@
-# Neural coref v2.0
+# Neural coref v3.0
 
 State-of-the-art coreference resolution library using neural nets and spaCy. [Try it online !](https://huggingface.co/coref/)
 ![Neuralcoref demo](https://huggingface.co/coref/assets/thumbnail-large.png)
 
-This coreference resolution module is based on the super fast [spaCy](https://spacy.io/) parser and uses the neural net scoring model described in [Deep Reinforcement Learning for Mention-Ranking Coreference Models](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf) by Kevin Clark and Christopher D. Manning, EMNLP 2016.
+This coreference resolution module is an extension to the super fast [spaCy](https://spacy.io/) parser and uses the neural net scoring model described in [Deep Reinforcement Learning for Mention-Ranking Coreference Models](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf) by Kevin Clark and Christopher D. Manning, EMNLP 2016.
 
-With ✨Neuralcoref v2.0, you should now be able to train  the coreference resolution system on your own dataset — e.g., another language than English! — **provided you have an annotated dataset**. Be sure to check [our medium post detailing the release of v2.0 and how to train the model](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe)  as well as our [first medium post](https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30) in which we talk more about coreference resolution in general.
+✨ Neuralcoref v3.0 is 100x faster than V2.0 and provided as pre-trained spaCy language models.
 
 ## Installation
 Clone the repo and install using pip (the trained model weights are too large for PyPI)
