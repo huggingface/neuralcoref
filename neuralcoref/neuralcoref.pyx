@@ -18,6 +18,7 @@ cimport cython
 from cpython cimport array
 import array
 from libc.stdint cimport uint16_t, uint32_t, uint64_t, uintptr_t, int32_t
+import cytoolz
 
 import numpy
 from cymem.cymem cimport Pool
@@ -474,7 +475,17 @@ cdef class NeuralCoref(object):
     def __reduce__(self):
         return (NeuralCoref, (self.vocab, self.model), None, None)
 
-    def __call__(self, Doc doc, greedyness=None, max_dist=None, max_dist_match=None,
+    def set_conv_dict(self, conv_dict):
+        self.conv_dict = Vectors()
+        for key, words in conv_dict.items():
+            norm_k = self.normalize(key)
+            norm_w = list(self.normalize(w) for w in words)
+            embed_vector = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
+            for hash_w in norm_w:
+                embed_vector += self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
+            self.conv_dict.add(key=norm_k, vector=embed_vector/max(len(norm_w), 1))
+
+    def __call__(self, doc, greedyness=None, max_dist=None, max_dist_match=None,
              conv_dict=None, blacklist=None):
         """Apply the pipeline component on a Doc object. """
         if greedyness is None:
@@ -489,240 +500,236 @@ cdef class NeuralCoref(object):
             blacklist = self.cfg.get('blacklist', False)
         if conv_dict is not None:
             self.set_conv_dict(conv_dict)
-        return self.build_clusters(doc, greedyness=greedyness, max_dist=max_dist,
-                            max_dist_match=max_dist_match, blacklist=blacklist)
+        annotations = self.predict([doc], greedyness=greedyness, max_dist=max_dist,
+                                  max_dist_match=max_dist_match, blacklist=blacklist)
+        self.set_annotations([doc], annotations)
+        return doc
 
-    def set_conv_dict(self, conv_dict):
-        self.conv_dict = Vectors()
-        for key, words in conv_dict.items():
-            norm_k = self.normalize(key)
-            norm_w = list(self.normalize(w) for w in words)
-            embed_vector = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
-            for hash_w in norm_w:
-                embed_vector += self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
-            self.conv_dict.add(key=norm_k, vector=embed_vector/max(len(norm_w), 1))
-
-    def pipe(self, docs, int batch_size=256, int n_threads=2,
-             float greedyness=0.5, int max_dist=50, int max_dist_match=500,
-             bint blacklist=False):
-        """Process a stream of documents.
+    def pipe(self, stream, batch_size=128, n_threads=1,
+             greedyness=None, max_dist=None, max_dist_match=None,
+             conv_dict=None, blacklist=None):
+        """Process a stream of documents. Currently not optimized.
         stream: The sequence of documents to process.
         batch_size (int): Number of documents to accumulate into a working set.
         n_threads (int): The number of threads with which to work on the buffer
             in parallel.
         YIELDS (Doc): Documents, in order.
         """
-        pass
+        if greedyness is None:
+            greedyness = self.cfg.get('greedyness', 0.5)
+        if max_dist is None:
+            max_dist = self.cfg.get('max_dist', 50)
+        if max_dist_match is None:
+            max_dist_match = self.cfg.get('max_dist_match', 500)
+        if conv_dict is None:
+            conv_dict = self.cfg.get('conv_dict', None)
+        if blacklist is None:
+            blacklist = self.cfg.get('blacklist', False)
+        for docs in cytoolz.partition_all(batch_size, stream):
+            docs = list(docs)
+            annotations = self.predict(docs, greedyness=greedyness, max_dist=max_dist,
+                                    max_dist_match=max_dist_match, blacklist=blacklist)
+            self.set_annotations(docs, annotations)
+            yield from docs
 
-    def build_clusters(self, Doc doc, float greedyness=0.5, int max_dist=50, int max_dist_match=500,
-                        conv_dict=None, bint blacklist=False):
-        ''' Build coreference clusters '''
+    def predict(self, docs, float greedyness=0.5, int max_dist=50, int max_dist_match=500,
+                conv_dict=None, bint blacklist=False):
+        ''' Predict coreference clusters
+        docs (iterable): A sequence of `Doc` objects.
+        RETURNS (iterable): List of (lists of mentions, lists of clusters, lists of main mentions per cluster) for each doc.
+        '''
         cdef:
             Mention_C* c
             Mention_C m1, m2
             TokenC* doc_c
+            Doc doc
             uint64_t i, ant_idx, men_idx, b_idx, n_mentions, n_pairs
             uint64_t [::1] p_ant, p_men, best_ant
             float [::1] embed, feats, doc_embed, mention_embed, best_score
             float [:, ::1] s_inp, p_inp
             float [:, ::1] score
-            Pool mem = Pool() # We use this for doc specific allocation
-
+            Pool mem
+            StringStore strings
         #    timespec ts
-        #    double timing0, timing1, timing2, timing3, timing4, timing5
-
+        #    double timing0, timing1, timing2, timing3, timing4
         # clock_gettime(CLOCK_REALTIME, &ts)
         # timing0 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
 
-        strings = doc.vocab.strings
-        # ''' Extract mentions '''
-        mentions, n_mentions = extract_mentions_spans(doc, self.hashes, blacklist=blacklist)
-        n_sents = len(list(doc.sents))
-        mentions = sorted((m for m in mentions), key=lambda m: (m.root.i, m.start))
-        c = <Mention_C*>mem.alloc(n_mentions, sizeof(Mention_C))
-        content_words = []
-        for i, m in enumerate(mentions):
-            c[i].entity_label = get_span_entity_label(m)
-            c[i].span_start = m.start
-            c[i].span_end = m.end
-            c[i].span_root = m.root.i
-            idx, sent_start, sent_end = get_span_sent(m)
-            c[i].sent_idx = idx
-            c[i].sent_start = sent_start
-            c[i].sent_end = sent_end
-            c[i].mention_type = get_span_type(m)
-            c[i].root_lower = (<Token>m.root).c.lex.lower
-            c[i].span_lower = strings.add(m.text.lower())
-            content_words.append(set(tok.lower_ for tok in m if tok.tag_ in CONTENT_TAGS))
-            c[i].content_words.length = len(content_words[-1])
-            c[i].content_words.arr = <hash_t*>mem.alloc(len(content_words[-1]), sizeof(hash_t))
-            for j, w in enumerate(content_words[-1]):
-                c[i].content_words.arr[j] = strings.add(w)
+        annotations = []
+        for doc in docs:
+            mem = Pool() # We use this for doc specific allocation
+            strings = doc.vocab.strings
+            # ''' Extract mentions '''
+            mentions, n_mentions = extract_mentions_spans(doc, self.hashes, blacklist=blacklist)
+            n_sents = len(list(doc.sents))
+            mentions = sorted((m for m in mentions), key=lambda m: (m.root.i, m.start))
+            c = <Mention_C*>mem.alloc(n_mentions, sizeof(Mention_C))
+            content_words = []
+            for i, m in enumerate(mentions):
+                c[i].entity_label = get_span_entity_label(m)
+                c[i].span_start = m.start
+                c[i].span_end = m.end
+                c[i].span_root = m.root.i
+                idx, sent_start, sent_end = get_span_sent(m)
+                c[i].sent_idx = idx
+                c[i].sent_start = sent_start
+                c[i].sent_end = sent_end
+                c[i].mention_type = get_span_type(m)
+                c[i].root_lower = (<Token>m.root).c.lex.lower
+                c[i].span_lower = strings.add(m.text.lower())
+                content_words.append(set(tok.lower_ for tok in m if tok.tag_ in CONTENT_TAGS))
+                c[i].content_words.length = len(content_words[-1])
+                c[i].content_words.arr = <hash_t*>mem.alloc(len(content_words[-1]), sizeof(hash_t))
+                for j, w in enumerate(content_words[-1]):
+                    c[i].content_words.arr[j] = strings.add(w)
 
-        # ''' Prepare arrays of pairs indices and features for feeding the model '''
-        # print("Prepare arrays")
-        pairs_ant = []
-        pairs_men = []
-        n_pairs = 0
-        if max_dist_match is not None:
-            word_to_mentions = {}
-            for i in range(n_mentions):
-                for tok in content_words[i]:
-                    if not tok in word_to_mentions:
-                        word_to_mentions[tok] = [i]
-                    else:
-                        word_to_mentions[tok].append(i)
-        for i in range(n_mentions):
-            if max_dist is None:
-                antecedents = set(range(<object>i))
-            else:
-                antecedents = set(range(max(0, <object>i - max_dist), <object>i))
+            # ''' Prepare arrays of pairs indices and features for feeding the model '''
+            pairs_ant = []
+            pairs_men = []
+            n_pairs = 0
             if max_dist_match is not None:
-                for tok in content_words[i]:
-                    with_string_match = word_to_mentions.get(tok, None)
-                    for match_idx in with_string_match:
-                        if match_idx < i and match_idx >= i - max_dist_match:
-                            antecedents.add(match_idx)
-            pairs_ant += list(antecedents)
-            pairs_men += [i]*len(antecedents)
-            n_pairs += len(antecedents)
-        p_ant_arr = numpy.asarray(pairs_ant, dtype=numpy.uint64)
-        p_men_arr = numpy.asarray(pairs_men, dtype=numpy.uint64)
-        p_ant = p_ant_arr
-        p_men = p_men_arr
-        s_inp_arr = numpy.zeros((n_mentions, SIZE_SNGL_IN_NO_GENRE + SIZE_GENRE), dtype='float32')
-        s_inp = s_inp_arr
-        p_inp_arr = numpy.zeros((n_pairs, SIZE_PAIR_IN_NO_GENRE + SIZE_GENRE), dtype='float32')
-        p_inp = p_inp_arr
+                word_to_mentions = {}
+                for i in range(n_mentions):
+                    for tok in content_words[i]:
+                        if not tok in word_to_mentions:
+                            word_to_mentions[tok] = [i]
+                        else:
+                            word_to_mentions[tok].append(i)
+            for i in range(n_mentions):
+                if max_dist is None:
+                    antecedents = set(range(<object>i))
+                else:
+                    antecedents = set(range(max(0, <object>i - max_dist), <object>i))
+                if max_dist_match is not None:
+                    for tok in content_words[i]:
+                        with_string_match = word_to_mentions.get(tok, None)
+                        for match_idx in with_string_match:
+                            if match_idx < i and match_idx >= i - max_dist_match:
+                                antecedents.add(match_idx)
+                pairs_ant += list(antecedents)
+                pairs_men += [i]*len(antecedents)
+                n_pairs += len(antecedents)
+            p_ant_arr = numpy.asarray(pairs_ant, dtype=numpy.uint64)
+            p_men_arr = numpy.asarray(pairs_men, dtype=numpy.uint64)
+            p_ant = p_ant_arr
+            p_men = p_men_arr
+            s_inp_arr = numpy.zeros((n_mentions, SIZE_SNGL_IN_NO_GENRE + SIZE_GENRE), dtype='float32')
+            s_inp = s_inp_arr
+            p_inp_arr = numpy.zeros((n_pairs, SIZE_PAIR_IN_NO_GENRE + SIZE_GENRE), dtype='float32')
+            p_inp = p_inp_arr
 
-        # clock_gettime(CLOCK_REALTIME, &ts)
-        # timing1 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+            # ''' Build single features and pair features arrays '''
+            doc_c = doc.c
+            doc_embedding = numpy.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
+            doc_embed = doc_embedding
+            for i in range(n_mentions):
+                s_inp_arr[i, :SGNL_FEATS_0] = self.get_mention_embeddings(mentions[i], doc_embedding) # Set embeddings
+                s_inp_arr[i, SGNL_FEATS_0 + c[i].mention_type] = 1                      # 01_MentionType
+                b_idx, val = index_distance(c[i].span_end - c[i].span_start - 1)    # 02_MentionLength
+                s_inp_arr[i, SGNL_FEATS_1 + b_idx] = 1
+                s_inp_arr[i, SGNL_FEATS_2] = val
+                val = float(i)/float(n_mentions)                                    # 03_MentionNormLocation
+                s_inp_arr[i, SGNL_FEATS_3] = val
+                s_inp_arr[i, SGNL_FEATS_4] = is_nested(c, n_mentions, i)                # 04_IsMentionNested
+            for i in range(n_pairs):
+                ant_idx = p_ant[i]
+                men_idx = p_men[i]
+                m1 = c[ant_idx]
+                m2 = c[men_idx]
+                p_inp[i, :PAIR_FEATS_0] = s_inp[ant_idx, :SGNL_FEATS_0]
+                p_inp[i, PAIR_FEATS_0:PAIR_FEATS_1] = s_inp[men_idx, :SGNL_FEATS_0]
+                p_inp[i, PAIR_FEATS_1] = 1                                          # 00_SameSpeaker
+                # p_inp[i, PAIR_FEATS_1 + 1] = 0                                    # 01_AntMatchMentionSpeaker # arrays are initialized to zero
+                # p_inp[i, PAIR_FEATS_1 + 2] = 0                                    # 02_MentionMatchSpeaker
+                p_inp[i, PAIR_FEATS_1 + 3] = heads_agree(m1, m2)                    # 03_HeadsAgree
+                p_inp[i, PAIR_FEATS_1 + 4] = exact_match(m1, m2)                    # 04_ExactStringMatch
+                p_inp[i, PAIR_FEATS_1 + 5] = relaxed_match(m1, m2)                  # 05_RelaxedStringMatch
+                b_idx, val = index_distance(m2.sent_idx - m1.sent_idx)              # 06_SentenceDistance
+                # p_inp[i, PAIR_FEATS_2:PAIR_FEATS_3] = 0
+                p_inp[i, PAIR_FEATS_2 + b_idx] = 1
+                p_inp[i, PAIR_FEATS_3] = val
+                b_idx, val = index_distance(men_idx - ant_idx - 1)                  # 07_MentionDistance
+                # p_inp[i, PAIR_FEATS_4:PAIR_FEATS_5] = 0
+                p_inp[i, PAIR_FEATS_4 + b_idx] = 1
+                p_inp[i, PAIR_FEATS_5] = val
+                p_inp[i, PAIR_FEATS_5 + 1] = overlapping(m1, m2)                    # 08_Overlapping
+                p_inp[i, PAIR_FEATS_6:PAIR_FEATS_7] = s_inp[ant_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 09_M1Features
+                p_inp[i, PAIR_FEATS_7:PAIR_FEATS_8] = s_inp[men_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 10_M2Features
+                # 11_DocGenre is zero currently
 
-        # ''' Build single features and pair features arrays '''
-        # print("Build single features", n_mentions, mentions)
-        doc_c = doc.c
-        doc_embedding = numpy.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
-        doc_embed = doc_embedding
-        for i in range(n_mentions):
-            s_inp_arr[i, :SGNL_FEATS_0] = self.get_mention_embeddings(mentions[i], doc_embedding) # Set embeddings
-            s_inp_arr[i, SGNL_FEATS_0 + c[i].mention_type] = 1                      # 01_MentionType
-            b_idx, val = index_distance(c[i].span_end - c[i].span_start - 1)    # 02_MentionLength
-            s_inp_arr[i, SGNL_FEATS_1 + b_idx] = 1
-            s_inp_arr[i, SGNL_FEATS_2] = val
-            val = float(i)/float(n_mentions)                                    # 03_MentionNormLocation
-            s_inp_arr[i, SGNL_FEATS_3] = val
-            s_inp_arr[i, SGNL_FEATS_4] = is_nested(c, n_mentions, i)                # 04_IsMentionNested
+            # ''' Compute scores '''
+            best_score_ar = numpy.empty((n_mentions), dtype='float32')
+            best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
+            best_score = best_score_ar
+            best_ant = best_ant_ar
+            score = self.model[0](s_inp_arr)
+            for i in range(n_mentions):
+                best_score[i] = score[i, 0] - 50 * (greedyness - 0.5)
+                best_ant[i] = i
+            score = self.model[1](p_inp_arr)
+            for i in range(n_pairs):
+                ant_idx = p_ant[i]
+                men_idx = p_men[i]
+                if score[i, 0] > best_score[men_idx]:
+                    best_score[men_idx] = score[i, 0]
+                    best_ant[men_idx] = ant_idx
 
-        # clock_gettime(CLOCK_REALTIME, &ts)
-        # timing2 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+            # ''' Build clusters '''
+            mention_to_cluster = list(range(n_mentions))
+            cluster_to_main = list(range(n_mentions))
+            clusters = dict((i, [i]) for i in mention_to_cluster)
+            for mention_idx, ant_idx in enumerate(best_ant):
+                if ant_idx != mention_idx:
+                    if mention_to_cluster[ant_idx] == mention_to_cluster[mention_idx]:
+                        continue
+                    keep_id = mention_to_cluster[ant_idx]
+                    remove_id = mention_to_cluster[mention_idx]
+                    for idx in clusters[remove_id]:
+                        mention_to_cluster[idx] = keep_id
+                        clusters[keep_id].append(idx)
+                    del clusters[remove_id]
+                    if c[ant_idx].mention_type != c[mention_idx].mention_type:
+                        if c[mention_idx].mention_type == MENTION_TYPE["PROPER"] \
+                            or (c[mention_idx].mention_type == MENTION_TYPE["NOMINAL"] and
+                                    c[ant_idx].mention_type == MENTION_TYPE["PRONOMINAL"]):
+                            cluster_to_main[ant_idx] = mention_idx
+            remove_id = []
+            main = list(mentions)
+            mentions_list = []
+            clusters_list = []
+            main_mentions_list = []
+            for key, m_idx_list in clusters.items():
+                if len(m_idx_list) != 1:
+                    m_list = list(mentions[i] for i in m_idx_list)
+                    main = mentions[cluster_to_main[key]]
+                    mentions_list += m_list
+                    clusters_list.append(m_list)
+                    main_mentions_list.append(main)
+            annotations.append((mentions_list, clusters_list, main_mentions_list))
 
-        # print("Build pair features")
-        for i in range(n_pairs):
-            ant_idx = p_ant[i]
-            men_idx = p_men[i]
-            m1 = c[ant_idx]
-            m2 = c[men_idx]
-            p_inp[i, :PAIR_FEATS_0] = s_inp[ant_idx, :SGNL_FEATS_0]
-            p_inp[i, PAIR_FEATS_0:PAIR_FEATS_1] = s_inp[men_idx, :SGNL_FEATS_0]
-            p_inp[i, PAIR_FEATS_1] = 1                                          # 00_SameSpeaker
-            # p_inp[i, PAIR_FEATS_1 + 1] = 0                                    # 01_AntMatchMentionSpeaker # arrays are initialized to zero
-            # p_inp[i, PAIR_FEATS_1 + 2] = 0                                    # 02_MentionMatchSpeaker
-            p_inp[i, PAIR_FEATS_1 + 3] = heads_agree(m1, m2)                    # 03_HeadsAgree
-            p_inp[i, PAIR_FEATS_1 + 4] = exact_match(m1, m2)                    # 04_ExactStringMatch
-            p_inp[i, PAIR_FEATS_1 + 5] = relaxed_match(m1, m2)                  # 05_RelaxedStringMatch
-            b_idx, val = index_distance(m2.sent_idx - m1.sent_idx)              # 06_SentenceDistance
-            # p_inp[i, PAIR_FEATS_2:PAIR_FEATS_3] = 0
-            p_inp[i, PAIR_FEATS_2 + b_idx] = 1
-            p_inp[i, PAIR_FEATS_3] = val
-            b_idx, val = index_distance(men_idx - ant_idx - 1)                  # 07_MentionDistance
-            # p_inp[i, PAIR_FEATS_4:PAIR_FEATS_5] = 0
-            p_inp[i, PAIR_FEATS_4 + b_idx] = 1
-            p_inp[i, PAIR_FEATS_5] = val
-            p_inp[i, PAIR_FEATS_5 + 1] = overlapping(m1, m2)                    # 08_Overlapping
-            p_inp[i, PAIR_FEATS_6:PAIR_FEATS_7] = s_inp[ant_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 09_M1Features
-            p_inp[i, PAIR_FEATS_7:PAIR_FEATS_8] = s_inp[men_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 10_M2Features
-            # 11_DocGenre is zero currently
+        return annotations
 
-        # clock_gettime(CLOCK_REALTIME, &ts)
-        # timing3 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
-
-        # ''' Compute scores '''
-        # print("Compute scores")
-        best_score_ar = numpy.empty((n_mentions), dtype='float32')
-        best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
-        best_score = best_score_ar
-        best_ant = best_ant_ar
-        score = self.model[0](s_inp_arr)
-        for i in range(n_mentions):
-            best_score[i] = score[i, 0] - 50 * (greedyness - 0.5)
-            best_ant[i] = i
-        score = self.model[1](p_inp_arr)
-        for i in range(n_pairs):
-            ant_idx = p_ant[i]
-            men_idx = p_men[i]
-            if score[i, 0] > best_score[men_idx]:
-                best_score[men_idx] = score[i, 0]
-                best_ant[men_idx] = ant_idx
-
-        # clock_gettime(CLOCK_REALTIME, &ts)
-        # timing4 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
-
-        # ''' Build clusters '''
-        mention_to_cluster = list(range(n_mentions))
-        cluster_to_main = list(range(n_mentions))
-        clusters = dict((i, [i]) for i in mention_to_cluster)
-        for mention_idx, ant_idx in enumerate(best_ant):
-            if ant_idx != mention_idx:
-                if mention_to_cluster[ant_idx] == mention_to_cluster[mention_idx]:
-                    continue
-                keep_id = mention_to_cluster[ant_idx]
-                remove_id = mention_to_cluster[mention_idx]
-                for idx in clusters[remove_id]:
-                    mention_to_cluster[idx] = keep_id
-                    clusters[keep_id].append(idx)
-                del clusters[remove_id]
-                if c[ant_idx].mention_type != c[mention_idx].mention_type:
-                    if c[mention_idx].mention_type == MENTION_TYPE["PROPER"] \
-                        or (c[mention_idx].mention_type == MENTION_TYPE["NOMINAL"] and
-                                c[ant_idx].mention_type == MENTION_TYPE["PRONOMINAL"]):
-                        cluster_to_main[ant_idx] = mention_idx
-        remove_id = []
-        main = list(mentions)
-        mentions_list = []
-        clusters_list = []
-        main_mentions_list = []
-        for key, m_idx_list in clusters.items():
-            if len(m_idx_list) != 1:
-                m_list = list(mentions[i] for i in m_idx_list)
-                main = mentions[cluster_to_main[key]]
-                mentions_list += m_list
-                clusters_list.append(m_list)
-                main_mentions_list.append(main)
-
-        # ''' Update doc '''
-        if len(clusters) != 0:
-            doc._.set('has_coref', True)
-            doc._.set('coref_mentions', mentions_list)
-            doc._.set('coref_clusters', clusters_list)
-            doc._.set('coref_main_mentions', main_mentions_list)
-            doc._.set('coref_resolved', get_resolved(doc, clusters_list, main_mentions_list))
-            for main, m_list in zip(main_mentions_list, clusters_list):
-                for mention in m_list:
-                    mention._.set('is_coref', True)
-                    mention._.set('coref_cluster', m_list)
-                    mention._.set('coref_main_mention', main)
-        # clock_gettime(CLOCK_REALTIME, &ts)
-        # timing5 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
-
-        # print("Timings")
-        # print("prepare mentions", timing1 - timing0)
-        # print("single features arrays", timing2 - timing1)
-        # print("pair features arrays", timing3 - timing2)
-        # print("scores", timing4 - timing3)
-        # print("final stuffs", timing5 - timing4)
-        # print("total", timing5 - timing0)
-        # print("length", len(doc))
-        return doc
+    def set_annotations(self, docs, annotations):
+        """Set the tensor attribute for a batch of documents.
+        docs (iterable): A sequence of `Doc` objects.
+        tensors (object): Vector representation for each token in the docs.
+        """
+        if isinstance(docs, Doc):
+            docs = [docs]
+        cdef Doc doc
+        for doc, annotation in zip(docs, annotations):
+            mentions_list, clusters_list, main_mentions_list = annotation
+            if len(clusters_list) != 0:
+                doc._.set('has_coref', True)
+                doc._.set('coref_mentions', mentions_list)
+                doc._.set('coref_clusters', clusters_list)
+                doc._.set('coref_main_mentions', main_mentions_list)
+                doc._.set('coref_resolved', get_resolved(doc, clusters_list, main_mentions_list))
+                for main, m_list in zip(main_mentions_list, clusters_list):
+                    for mention in m_list:
+                        mention._.set('is_coref', True)
+                        mention._.set('coref_cluster', m_list)
+                        mention._.set('coref_main_mention', main)
 
     def normalize(self, Token token):
         return self.hashes.digit_word if token.is_digit else token.lower

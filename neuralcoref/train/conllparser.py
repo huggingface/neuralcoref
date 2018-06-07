@@ -21,9 +21,9 @@ import numpy as np
 
 from tqdm import tqdm
 
-from neuralcoref.compat import unicode_
-from neuralcoref.document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
-from neuralcoref.utils import parallel_process
+from .compat import unicode_
+from .document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
+from .utils import parallel_process
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]
