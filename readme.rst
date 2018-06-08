@@ -47,8 +47,8 @@ en_coref_lg        `en_coref_lg`_      893 Mo       A *large* English model base
 .. _en_core_web_lg-2.0.0: https://github.com/explosion/spacy-models/releases/tag/en_core_web_lg-2.0.0
 
 .. _en_coref_sm: https://github.com/huggingface/neuralcoref-models/releases/download/en_coref_sm-3.0.0/en_coref_sm-3.0.0.tar.gz
-.. _en_coref_md: https://github.com/huggingface/neuralcoref-models/archive/en_coref_md-3.0.0.tar.gz
-.. _en_coref_lg: https://github.com/huggingface/neuralcoref-models/archive/en_coref_lg-3.0.0.tar.gz
+.. _en_coref_md: https://github.com/huggingface/neuralcoref-models/releases/download/en_coref_md-3.0.0/en_coref_md-3.0.0.tar.gz
+.. _en_coref_lg: https://github.com/huggingface/neuralcoref-models/releases/download/en_coref_lg-3.0.0/en_coref_lg-3.0.0.tar.gz
 
 You can then install the model as follows.
 
