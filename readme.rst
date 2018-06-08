@@ -36,12 +36,12 @@ This is the easiest way to install NeuralCoref, if you don't need to train the m
 
 NeuralCoref is currently available in English with three models of increasing accuracy that mirror `spaCy english models <https://spacy.io/models/en>`_. The larger the model, the higher the accuracy:
 
-================== =================== ============ ====================================================
-**Model Name**     **MODEL_URL**       **Size**     **Description**
-en_coref_sm        `en_coref_sm`_      78 Mo        A *small* English model based on spaCy `en_core_web_sm-2.0.0`_
-en_coref_md        `en_coref_md`_      161 Mo       [Default] A *medium* English model based on spaCy `en_core_web_md-2.0.0`_ 
-en_coref_lg        `en_coref_lg`_      893 Mo       A *large* English model based on spaCy `en_core_web_lg-2.0.0`_
-================== =================== ============ ====================================================
+================== =================== =============== ====================================================
+**Model Name**     **MODEL_URL**       **Size**        **Description**
+en_coref_sm        `en_coref_sm`_      78 Mo           A *small* English model based on spaCy `en_core_web_sm-2.0.0`_
+en_coref_md        `en_coref_md`_      161 Mo          [Default] A *medium* English model based on spaCy `en_core_web_md-2.0.0`_ 
+en_coref_lg        `en_coref_lg`_      893 Mo          A *large* English model based on spaCy `en_core_web_lg-2.0.0`_
+================== =================== =============== ====================================================
 
 .. _en_core_web_sm-2.0.0: https://github.com/explosion/spacy-models/releases/tag/en_core_web_sm-2.0.0
 .. _en_core_web_md-2.0.0: https://github.com/explosion/spacy-models/releases/tag/en_core_web_md-2.0.0
@@ -182,6 +182,6 @@ There are many other ways you can manage and deploy NeuralCoref. Some examples c
 Re-train the model / Extend to another language
 ===============================================
 
-If you want to retrain the model or train it on another language, see our detailed `training instructions <training.md>`_ as well as our `detailed blog post <https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe>`_
+If you want to retrain the model or train it on another language, see our detailed `training instructions <./neuralcoref/train/training.md>`_ as well as our `detailed blog post <https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe>`_
 
 The training code will soon benefit from the same Cython refactoring than the inference code.
