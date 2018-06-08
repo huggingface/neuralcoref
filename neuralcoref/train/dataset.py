@@ -14,23 +14,10 @@ import torch.utils.data
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset
 
-from neuralcoref.utils import encode_distance
+from neuralcoref.utils import (encode_distance, BATCH_SIZE_PATH, SIZE_FP,
+                               SIZE_FP_COMPRESSED, SIZE_FS, SIZE_FS_COMPRESSED,
+                               SIZE_GENRE, SIZE_PAIR_IN, SIZE_SINGLE_IN)
 from neuralcoref.conllparser import FEATURES_NAMES
-
-PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
-BATCH_SIZE_PATH = os.path.join(PACKAGE_DIRECTORY, "test_batch_size.txt") #fernandes.txt")#
-
-SIZE_SPAN = 250 # size of the span vector (averaged word embeddings)
-SIZE_WORD = 8 # number of words in a mention (tuned embeddings)
-SIZE_EMBEDDING = 50 # size of the words embeddings
-SIZE_FP = 70 # number of features for a pair of mention
-SIZE_FP_COMPRESSED = 9 # size of the features for a pair of mentions as stored in numpy arrays
-SIZE_FS = 24 # number of features of a single mention
-SIZE_FS_COMPRESSED = 6 # size of the features for a mention as stored in numpy arrays
-SIZE_GENRE = 7 # Size of the genre one-hot array
-
-SIZE_PAIR_IN = 2 * SIZE_SPAN + 2 * SIZE_WORD * SIZE_EMBEDDING + SIZE_FP # Input to the mentions pair neural network
-SIZE_SINGLE_IN = SIZE_SPAN + SIZE_WORD * SIZE_EMBEDDING + SIZE_FS  # Input to the single mention neural network
 
 def load_embeddings_from_file(name):
     print("loading", name+"_embeddings.npy")

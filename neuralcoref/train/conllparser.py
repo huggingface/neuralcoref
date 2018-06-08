@@ -21,9 +21,9 @@ import numpy as np
 
 from tqdm import tqdm
 
-from neuralcoref.compat import unicode_
-from neuralcoref.document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
-from neuralcoref.utils import parallel_process
+from .compat import unicode_
+from .document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
+from .utils import parallel_process
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]
@@ -590,7 +590,7 @@ class ConllCorpus(object):
         print("🌋 Building docs")
         for name, part in self.docs_names:
             self.docs.append(ConllDoc(name=name, part=part, nlp=None,
-                                      use_no_coref_list=False, consider_speakers=True,
+                                      blacklist=False, consider_speakers=True,
                                       embedding_extractor=self.embed_extractor,
                                       conll=CONLL_GENRES[name[:2]]))
         print("🌋 Loading spacy model")

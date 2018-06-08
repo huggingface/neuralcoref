@@ -1,4 +1,6 @@
 # coding: utf8
+# cython: profile=True
+# cython: infer_types=True
 """Coref resolution"""
 
 from __future__ import unicode_literals
@@ -9,10 +11,9 @@ import os
 import spacy
 import numpy as np
 
+from neuralcoref.utils import PACKAGE_DIRECTORY, SIZE_PAIR_IN, SIZE_SINGLE_IN
 from neuralcoref.compat import unicode_
 from neuralcoref.document import Document, MENTION_TYPE, NO_COREF_LIST
-
-PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
 #######################
 ##### UTILITIES #######
@@ -48,20 +49,16 @@ class Model(object):
 
     def _score(self, features, layers):
         for weights, bias in layers:
+            #print("features", features.shape)
             features = np.matmul(weights, features) + bias
             if weights.shape[0] > 1:
                 features = np.maximum(features, 0) # ReLU
-        return np.sum(features)
+        return np.sum(features, axis=0)
 
-    def get_single_mention_score(self, mention, anaphoricity_features):
-        first_layer_input = np.concatenate([mention.embedding,
-                                            anaphoricity_features], axis=0)[:, np.newaxis]
+    def get_multiple_single_score(self, first_layer_input):
         return self._score(first_layer_input, self.single_mention_model)
 
-    def get_pair_mentions_score(self, antecedent, mention, pair_features):
-        first_layer_input = np.concatenate([antecedent.embedding,
-                                            mention.embedding,
-                                            pair_features], axis=0)[:, np.newaxis]
+    def get_multiple_pair_score(self, first_layer_input):
         return self._score(first_layer_input, self.pair_mentions_model)
 
 
@@ -70,13 +67,13 @@ class Coref(object):
     Main coreference resolution algorithm
     '''
     def __init__(self, nlp=None, greedyness=0.5, max_dist=50, max_dist_match=500, conll=None,
-                 use_no_coref_list=True, debug=False):
+                 blacklist=True, debug=False):
         self.greedyness = greedyness
         self.max_dist = max_dist
         self.max_dist_match = max_dist_match
         self.debug = debug
         model_path = os.path.join(PACKAGE_DIRECTORY, "weights/conll/" if conll is not None else "weights/")
-        trained_embed_path = os.path.join(PACKAGE_DIRECTORY, "weights/")
+        model_path = os.path.join(PACKAGE_DIRECTORY, "weights/")
         print("Loading neuralcoref model from", model_path)
         self.coref_model = Model(model_path)
         if nlp is None:
@@ -89,13 +86,11 @@ class Coref(object):
                 spacy.info('en')
                 model = 'en'
             nlp = spacy.load(model)
-        self.data = Document(nlp, conll=conll, use_no_coref_list=use_no_coref_list, trained_embed_path=trained_embed_path)
+        self.data = Document(nlp, conll=conll, blacklist=blacklist, model_path=model_path)
         self.clusters = {}
         self.mention_to_cluster = []
         self.mentions_single_scores = {}
-        self.mentions_single_features = {}
         self.mentions_pairs_scores = {}
-        self.mentions_pairs_features = {}
 
     ###################################
     #### ENTITY CLUSTERS FUNCTIONS ####
@@ -108,14 +103,10 @@ class Coref(object):
         self.mention_to_cluster = list(range(len(self.data.mentions)))
         self.clusters = dict((i, [i]) for i in self.mention_to_cluster)
         self.mentions_single_scores = {}
-        self.mentions_single_features = {}
         self.mentions_pairs_scores = {}
-        self.mentions_pairs_features = {}
         for mention in self.mention_to_cluster:
             self.mentions_single_scores[mention] = None
-            self.mentions_single_features[mention] = None
             self.mentions_pairs_scores[mention] = {}
-            self.mentions_pairs_features[mention] = {}
 
     def _merge_coreference_clusters(self, ant_idx, mention_idx):
         '''
@@ -155,28 +146,38 @@ class Coref(object):
 
     def run_coref_on_mentions(self, mentions):
         '''
-        Run the coreference model on a mentions iterator or list
+        Run the coreference model on a mentions list
         '''
         best_ant = {}
+        best_score = {}
         n_ant = 0
-        for mention_idx, ant_list in self.data.get_candidate_pairs(mentions, self.max_dist, self.max_dist_match):
+        inp = np.empty((SIZE_SINGLE_IN, len(mentions)))
+        for i, mention_idx in enumerate(mentions):
             mention = self.data[mention_idx]
-            feats_, ana_feats = self.data.get_single_mention_features(mention)
-            single_score = self.coref_model.get_single_mention_score(mention, ana_feats)
-            self.mentions_single_scores[mention_idx] = single_score
-            self.mentions_single_features[mention_idx] = {"spansEmbeddings": mention.spans_embeddings_, "wordsEmbeddings": mention.words_embeddings_, "features": feats_}
-            best_score = single_score - 50 * (self.greedyness - 0.5)
+            print("mention.embedding", mention.embedding.shape)
+            inp[:len(mention.embedding), i] = mention.embedding
+            inp[:len(mention.embedding), i] = mention.features
+            inp[:len(mention.embedding), i] = self.data.genre
+        score = self.coref_model.get_multiple_single_score(inp.T)
+        for mention_idx, s in zip(mentions, score):
+            self.mentions_single_scores[mention_idx] = s
+            best_score[mention_idx] = s - 50 * (self.greedyness - 0.5)
+
+        for mention_idx, ant_list in self.data.get_candidate_pairs(mentions, self.max_dist, self.max_dist_match):
+            if len(ant_list) == 0:
+                continue
+            inp_l = []
             for ant_idx in ant_list:
+                mention = self.data[mention_idx]
                 antecedent = self.data[ant_idx]
                 feats_, pwf = self.data.get_pair_mentions_features(antecedent, mention)
-                score = self.coref_model.get_pair_mentions_score(antecedent, mention, pwf)
-                self.mentions_pairs_scores[mention_idx][ant_idx] = score
-                self.mentions_pairs_features[mention_idx][ant_idx] = {"pairFeatures": feats_, "antecedentSpansEmbeddings": antecedent.spans_embeddings_,
-                                                                      "antecedentWordsEmbeddings": antecedent.words_embeddings_,
-                                                                      "mentionSpansEmbeddings": mention.spans_embeddings_,
-                                                                      "mentionWordsEmbeddings": mention.words_embeddings_ }
-                if score > best_score:
-                    best_score = score
+                inp_l.append(pwf)
+            inp = np.stack(inp_l, axis=0)
+            score = self.coref_model.get_multiple_pair_score(inp.T)
+            for ant_idx, s in zip(ant_list, score):
+                self.mentions_pairs_scores[mention_idx][ant_idx] = s
+                if s > best_score[mention_idx]:
+                    best_score[mention_idx] = s
                     best_ant[mention_idx] = ant_idx
             if mention_idx in best_ant:
                 n_ant += 1
@@ -255,9 +256,9 @@ class Coref(object):
         else:
             return self.data.utterances
 
-    def get_resolved_utterances(self, last_utterances_added=True, use_no_coref_list=True):
+    def get_resolved_utterances(self, last_utterances_added=True, blacklist=True):
         ''' Return a list of utterrances text where the '''
-        coreferences = self.get_most_representative(last_utterances_added, use_no_coref_list)
+        coreferences = self.get_most_representative(last_utterances_added, blacklist)
         resolved_utterances = []
         for utt in self.get_utterances(last_utterances_added=last_utterances_added):
             resolved_utt = ""
@@ -286,12 +287,12 @@ class Coref(object):
         return {"single_scores": self.mentions_single_scores,
                 "pair_scores": self.mentions_pairs_scores}
 
-    def get_clusters(self, remove_singletons=False, use_no_coref_list=False):
+    def get_clusters(self, remove_singletons=False, blacklist=False):
         ''' Retrieve cleaned clusters'''
         clusters = self.clusters
         mention_to_cluster = self.mention_to_cluster
         remove_id = []
-        if use_no_coref_list:
+        if blacklist:
             for key, mentions in clusters.items():
                 cleaned_list = []
                 for mention_idx in mentions:
@@ -322,14 +323,14 @@ class Coref(object):
 
         return clusters, mention_to_cluster
 
-    def get_most_representative(self, last_utterances_added=True, use_no_coref_list=True):
+    def get_most_representative(self, last_utterances_added=True, blacklist=True):
         '''
         Find a most representative mention for each cluster
 
         Return:
             Dictionnary of {original_mention: most_representative_resolved_mention, ...}
         '''
-        clusters, _ = self.get_clusters(remove_singletons=True, use_no_coref_list=use_no_coref_list)
+        clusters, _ = self.get_clusters(remove_singletons=True, blacklist=blacklist)
         coreferences = {}
         for key in self.data.get_candidate_mentions(last_utterances_added=last_utterances_added):
             if self.mention_to_cluster[key] is None:
@@ -348,19 +349,3 @@ class Coref(object):
                         representative = mention
 
         return coreferences
-
-if __name__ == '__main__':
-    coref = Coref(use_no_coref_list=False)
-    if len(sys.argv) > 1:
-        sent = sys.argv[1]
-        coref.one_shot_coref(sent)
-    else:
-        coref.one_shot_coref(u"Yes, I noticed that many friends, around me received it. It seems that almost everyone received this SMS.")#u"My sister has a dog. She loves him.")
-    mentions = coref.get_mentions()
-    print(mentions)
-
-    utterances = coref.get_utterances()
-    print(utterances)
-
-    resolved_utterance_text = coref.get_resolved_utterances()
-    print(resolved_utterance_text)
