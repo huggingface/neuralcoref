@@ -37,6 +37,7 @@ from spacy.lexeme cimport Lexeme
 from spacy.attrs cimport IS_DIGIT
 from spacy.vectors import Vectors
 from spacy import util
+from spacy.compat import is_config
 
 from thinc.v2v import Model, ReLu, Affine
 from thinc.api import chain, clone
@@ -258,13 +259,13 @@ cdef get_span_type(Span span):
         mention_type = MENTION_TYPE["NOMINAL"]
     return mention_type
 
-def get_resolved(doc, clusters_list, main_mentions_list):
+def get_resolved(doc, clusters):
     ''' Return a list of utterrances text where the coref are resolved to the most representative mention'''
     resolved = list(tok.text_with_ws for tok in doc)
-    for main, cluster in zip(main_mentions_list, clusters_list):
+    for cluster in clusters:
         for coref in cluster:
-            if coref != main:
-                resolved[coref.start] = main.text + doc[coref.end-1].whitespace_
+            if coref != cluster.main:
+                resolved[coref.start] = cluster.main.text + doc[coref.end-1].whitespace_
                 for i in range(coref.start+1, coref.end):
                     resolved[i] = ""
     return ''.join(resolved)
@@ -413,7 +414,38 @@ cdef extract_mentions_spans(Doc doc, HashesList hashes, bint blacklist=False):
 
 
 ##########################
-###### MAIN CLASS ########
+###### MAIN CLASSES ########
+
+class Cluster:
+    """ A utility class to store our annotations in the spaCy Doc """
+    def __init__(self, i, main, mentions):
+        self.i = i
+        self.main = main
+        self.mentions = mentions
+
+    def __getitem__(self, i):
+        return self.mentions[i]
+
+    def __iter__(self):
+        for mention in self.mentions:
+            yield mention
+
+    def __len__(self):
+        return len(self.mentions)
+
+    def __unicode__(self):
+        return unicode(self.main) + u': ' + unicode(self.mentions)
+
+    def __bytes__(self):
+        return unicode(self).encode('utf-8')
+
+    def __str__(self):
+        if is_config(python3=True):
+            return self.__unicode__()
+        return self.__bytes__()
+
+    def __repr__(self):
+        return self.__str__()
 
 cdef class NeuralCoref(object):
     """ spaCy v2.0 Coref pipeline component """
@@ -453,7 +485,7 @@ cdef class NeuralCoref(object):
         if 'max_dist_match' not in cfg:
             cfg['max_dist_match'] = util.env_opt('max_dist_match', 500)
         if 'blacklist' not in cfg:
-            cfg['blacklist'] = util.env_opt('blacklist', False)
+            cfg['blacklist'] = util.env_opt('blacklist', True)
         if 'conv_dict' not in cfg:
             cfg['conv_dict'] = util.env_opt('conv_dict', None)
         self.cfg = cfg
@@ -464,13 +496,12 @@ cdef class NeuralCoref(object):
 
         # Register attributes on Doc and Span
         Doc.set_extension('has_coref', default=False)
-        Doc.set_extension('coref_mentions', default=None)
         Doc.set_extension('coref_clusters', default=None)
-        Doc.set_extension('coref_main_mentions', default=None)
         Doc.set_extension('coref_resolved', default="")
         Span.set_extension('is_coref', default=False)
         Span.set_extension('coref_cluster', default=None)
-        Span.set_extension('coref_main_mention', default=None)
+        Token.set_extension('in_coref', getter=self.token_in_coref)
+        Token.set_extension('coref_clusters', getter=self.token_clusters)
 
     def __reduce__(self):
         return (NeuralCoref, (self.vocab, self.model), None, None)
@@ -497,7 +528,7 @@ cdef class NeuralCoref(object):
         if conv_dict is None:
             conv_dict = self.cfg.get('conv_dict', None)
         if blacklist is None:
-            blacklist = self.cfg.get('blacklist', False)
+            blacklist = self.cfg.get('blacklist', True)
         if conv_dict is not None:
             self.set_conv_dict(conv_dict)
         annotations = self.predict([doc], greedyness=greedyness, max_dist=max_dist,
@@ -524,7 +555,7 @@ cdef class NeuralCoref(object):
         if conv_dict is None:
             conv_dict = self.cfg.get('conv_dict', None)
         if blacklist is None:
-            blacklist = self.cfg.get('blacklist', False)
+            blacklist = self.cfg.get('blacklist', True)
         for docs in cytoolz.partition_all(batch_size, stream):
             docs = list(docs)
             annotations = self.predict(docs, greedyness=greedyness, max_dist=max_dist,
@@ -693,19 +724,15 @@ cdef class NeuralCoref(object):
                             or (c[mention_idx].mention_type == MENTION_TYPE["NOMINAL"] and
                                     c[ant_idx].mention_type == MENTION_TYPE["PRONOMINAL"]):
                             cluster_to_main[ant_idx] = mention_idx
-            remove_id = []
-            main = list(mentions)
-            mentions_list = []
             clusters_list = []
-            main_mentions_list = []
+            i = 0
             for key, m_idx_list in clusters.items():
                 if len(m_idx_list) != 1:
                     m_list = list(mentions[i] for i in m_idx_list)
                     main = mentions[cluster_to_main[key]]
-                    mentions_list += m_list
-                    clusters_list.append(m_list)
-                    main_mentions_list.append(main)
-            annotations.append((mentions_list, clusters_list, main_mentions_list))
+                    clusters_list.append(Cluster(i, main, m_list))
+                    i += 1
+            annotations.append(clusters_list)
 
         return annotations
 
@@ -717,19 +744,32 @@ cdef class NeuralCoref(object):
         if isinstance(docs, Doc):
             docs = [docs]
         cdef Doc doc
-        for doc, annotation in zip(docs, annotations):
-            mentions_list, clusters_list, main_mentions_list = annotation
-            if len(clusters_list) != 0:
+        for doc, clusters in zip(docs, annotations):
+            if len(clusters) != 0:
                 doc._.set('has_coref', True)
-                doc._.set('coref_mentions', mentions_list)
-                doc._.set('coref_clusters', clusters_list)
-                doc._.set('coref_main_mentions', main_mentions_list)
-                doc._.set('coref_resolved', get_resolved(doc, clusters_list, main_mentions_list))
-                for main, m_list in zip(main_mentions_list, clusters_list):
-                    for mention in m_list:
+                doc._.set('coref_clusters', clusters)
+                doc._.set('coref_resolved', get_resolved(doc, clusters))
+                for cluster in clusters:
+                    for mention in cluster:
                         mention._.set('is_coref', True)
-                        mention._.set('coref_cluster', m_list)
-                        mention._.set('coref_main_mention', main)
+                        mention._.set('coref_cluster', cluster)
+
+    def token_in_coref(self, token):
+        """Getter for Token attributes. Returns True if the token
+        is in a cluster."""
+        return any([token in mention for cluster in token.doc._.coref_clusters
+                    for mention in cluster])
+
+    def token_clusters(self, token):
+        """Getter for Token attributes. Returns a list of the cluster in which the token
+        is."""
+        clusters = []
+        for cluster in token.doc._.coref_clusters:
+            for mention in cluster:
+                if token in mention:
+                    clusters.append(cluster)
+                    break
+        return clusters
 
     def normalize(self, Token token):
         return self.hashes.digit_word if token.is_digit else token.lower
@@ -763,7 +803,7 @@ cdef class NeuralCoref(object):
         return embed_arr
 
     def get_mention_embeddings(self, Span span, doc_embedding):
-        ''' Set span (averaged) and word (single) embeddings of a mention '''
+        ''' Create a mention embedding with span (averaged) and word (single) embeddings '''
         doc = span.doc
         sent = span.sent
         embeddings = numpy.zeros((EMBED_13, ), dtype='float32')
