@@ -159,9 +159,9 @@ Here are some example on how you can navigate the coreference cluster chains.
     doc = nlp(u'My sister has a dog. She loves him')
 
     doc._.coref_clusters
-    doc._.coref_clusters[0].mentions
+    doc._.coref_clusters[1].mentions
     doc._.coref_clusters[1].mentions[-1]
-    doc._.coref_clusters[0].mentions[-1]._.coref_cluster.main
+    doc._.coref_clusters[1].mentions[-1]._.coref_cluster.main
 
     token = doc[-1]
     token._.in_coref
