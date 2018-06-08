@@ -1,10 +1,10 @@
-NeuralCoref: State-of-the-art Coreference Resolution using Neural Networks and spaCy.
-******************************************************************************************
+NeuralCoref: Coreference Resolution in spaCy with Neural Networks.
+*******************************************************************
 
-NeuralCoref is a pipeline extension for spaCy 2.0 that annotates and resolves coreference clusters. NeuralCoref is based on a neural network model with the aim of making state-of-the-art coreference resolution production-ready, naturally integrated in a Python NLP pipeline and easily extensible to new training datasets.
+NeuralCoref is a pipeline extension for spaCy 2.0 that annotates and resolves coreference clusters. NeuralCoref is based on a neural network model, production-ready, integrated in spaCy's NLP pipeline and easily extensible to new training datasets.
 
-For a brief introduction to coreference resolution and NeuralCoref, please refere to our [blog post](https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30).
-NeuralCoref is written in Python/Cython and comes with pre-trained statistical models for English. It can be extended to other languages. NeuralCoref is accompanied by a visualization client [NeuralCoref-Viz](https://github.com/huggingface/neuralcoref-viz), a web interface  powered by a REST server that can be [tried online](https://huggingface.co/coref/). NeuralCoref is commercial open-source software released under the MIT license.
+For a brief introduction to coreference resolution and NeuralCoref, please refere to our `blog post <https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30>`_.
+NeuralCoref is written in Python/Cython and comes with pre-trained statistical models for English. It can be trained in other languages. NeuralCoref is accompanied by a visualization client `NeuralCoref-Viz <https://github.com/huggingface/neuralcoref-viz>`_, a web interface  powered by a REST server that can be `tried online <https://huggingface.co/coref/>`_. NeuralCoref is released under the MIT license.
 
 
 ✨ Version 3.0 out now! 100x faster and tightly integrated in spaCy pipeline.
@@ -21,8 +21,11 @@ NeuralCoref is written in Python/Cython and comes with pre-trained statistical m
     :alt: NeuralCoref online Demo
 
 
-Install NeuralCoref as a pre-trained model
-==========================================
+Install NeuralCoref
+===================
+
+As a pre-trained spaCy model
+----------------------------
 
 This is the easiest way to install NeuralCoref, if you don't need to train the model on a new language or dataset.
 
@@ -31,14 +34,12 @@ This is the easiest way to install NeuralCoref, if you don't need to train the m
 **Python version**   CPython 2.7, 3.4+. Only 64 bit.
 ==================== ===
 
-NeuralCoref is currently available in English in three versions that mirror `spaCy english models <https://spacy.io/models/en>`_. The larger the model, the higher the accuracy.
-
-To install a model, copy the **MODEL_URL** of the release you are interested in from the following table
+NeuralCoref is currently available in English with three models of increasing accuracy that mirror `spaCy english models <https://spacy.io/models/en>`_. The larger the model, the higher the accuracy:
 
 ================== =================== ============ ====================================================
 **Model Name**     **MODEL_URL**       **Size**     **Description**
 en_coref_sm        `en_coref_sm`_      78 Mo        A *small* English model based on spaCy `en_core_web_sm-2.0.0`_
-en_coref_md        `en_coref_md`_      161 Mo       A *medium* English model based on spaCy `en_core_web_md-2.0.0`_
+en_coref_md        `en_coref_md`_      161 Mo       [Default] A *medium* English model based on spaCy `en_core_web_md-2.0.0`_ 
 en_coref_lg        `en_coref_lg`_      893 Mo       A *large* English model based on spaCy `en_core_web_lg-2.0.0`_
 ================== =================== ============ ====================================================
 
@@ -50,7 +51,7 @@ en_coref_lg        `en_coref_lg`_      893 Mo       A *large* English model base
 .. _en_coref_md: https://github.com/huggingface/neuralcoref-models/releases/download/en_coref_md-3.0.0/en_coref_md-3.0.0.tar.gz
 .. _en_coref_lg: https://github.com/huggingface/neuralcoref-models/releases/download/en_coref_lg-3.0.0/en_coref_lg-3.0.0.tar.gz
 
-You can then install the model as follows.
+To install a model, copy the **MODEL_URL** of the model you are interested in from the above table and type:
 
 .. code:: bash
 
@@ -67,8 +68,8 @@ environment to avoid modifying system state:
 
 
 Install NeuralCoref from source
-===============================
-Clone the repo and install using pip (the trained model weights are too large for PyPI)
+-------------------------------
+Clone the repo and install using pip.
 
 .. code:: bash
 
@@ -77,47 +78,41 @@ Clone the repo and install using pip (the trained model weights are too large fo
 	pip install -e .
 
 
-The install script will install `spacy` and `falcon` (only used by the server).
-
-You will also need a Language model for spaCy if you don't already have one. Please refer to [spaCy's models webpage](https://spacy.io/models/) to download and install a model.
-
-The mention extraction module is strongly influenced by the quality of the parsing so we recommend selecting a model with a higher accuray than usual.
-
 Usage
 ===============================
 Loading NeuralCoref
 -------------------
-NeuralCoref is now integrated as a spaCy Pipeline Extension in the provided models.
+NeuralCoref is integrated as a spaCy Pipeline Extension .
 
-To load NeuralCoref, simply load the model you dowloaded above using ``spacy.load()`` with the model's shortcut link and process your text. 
+To load NeuralCoref, simply load the model you dowloaded above using ``spacy.load()`` with the model's name (e.g. `en_coref_md`) and process your text `as usual with spaCy <https://spacy.io/usage>`_.
 
-NeuralCoref will resolve the coreferences and add several `extension attributes <https://spacy.io/usage/processing-pipelines#custom-components-extensions>`_ to the spaCy ``Doc`` and ``Span`` objects like the usual spaCy annotations.
+NeuralCoref will resolve the coreferences and annotate them as `extension attributes <https://spacy.io/usage/processing-pipelines#custom-components-extensions>`_ in the spaCy ``Doc``,  ``Span`` and ``Token`` objects under the `._.` dictionary.
 
-Here is a simple example before we list in greater detail NeuralCoref annotations.
+Here is a simple example before we dive in greater details.
 
 .. code:: python
 
     import spacy
-    nlp = spacy.load('en_coref_sm')
+    nlp = spacy.load('en_coref_md')
     doc = nlp(u'My sister has a dog. She loves him.')
 
     doc._.has_coref
     doc._.coref_clusters
 
-You can also ``import`` NeuralCoref model directly and then call its ``load()`` method:
+You can also ``import`` NeuralCoref model directly and call its ``load()`` method:
 
 .. code:: python
 
     import spacy
-    import en_coref_sm
+    import en_coref_md
 
-    nlp = en_coref_sm.load()
+    nlp = en_coref_md.load()
     doc = nlp(u'My sister has a dog. She loves him.')
 
     doc._.has_coref
     doc._.coref_clusters
 
-spaCy Doc, Span and Token Extension Attributes
+Doc, Span and Token Extension Attributes
 ----------------------------------------------
 ============================= ====================== ====================================================
 **Attribute**                 **Type**               **Description**
@@ -130,9 +125,9 @@ spaCy Doc, Span and Token Extension Attributes
 ``token._.coref_clusters``    list of ``Cluster``    All the clusters of corefering mentions that contains the token
 ============================= ====================== ====================================================
 
-Cluster objects
----------------
-The Cluster class is a small container for accessing a cluster of mentions.
+The Cluster class
+-----------------
+The Cluster class is a small container for a cluster of mentions.
 
 A ``Cluster`` contains 3 attributes:
 
@@ -147,7 +142,7 @@ The ``Cluster`` class also implements a few Python class methods to simplify the
 
 ======================== ======================== ====================================================
 **Method**               **Output**               **Description**
-``Cluster.__getitem__``  return ``Span``          A mention in the cluster
+``Cluster.__getitem__``  return ``Span``          Access a mention in the cluster
 ``Cluster.__iter__``     yields ``Span``          Iterate over mentions in the cluster
 ``Cluster.__len__``      return int               Number of mentions in the cluster
 ======================== ======================== ====================================================
@@ -155,7 +150,7 @@ The ``Cluster`` class also implements a few Python class methods to simplify the
 Examples
 --------
 
-Here are some example on how you can navigate in the coreference cluster chains.
+Here are some example on how you can navigate the coreference cluster chains.
 
 .. code:: python
 
