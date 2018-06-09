@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 #---- standard library imports ----#
+from __future__ import print_function
 import sys
 
 # version check
@@ -21,6 +22,11 @@ import collections
 import ConfigParser
 from optparse import OptionParser
 
+try:
+    cmp
+except NameError:
+    def cmp(a, b):
+        return (a > b) - (a < b)
 
 PART_COLUMN=1
 WORD_COLUMN=3
@@ -467,14 +473,14 @@ class coreference_tagged_sentence:
 
             for i in range(0, len(bits)):
                 if(bits[i].startswith("(")):
-                    if(not chain_start_hash.has_key(ids[i])):
+                    if(ids[i] not in chain_start_hash):
                         chain_start_hash[ids[i]] = []
                     chain_start_hash[ids[i]].append(r_i)
 
                 if(bits[i].endswith(")")):
 
-                    if(not chain_start_hash.has_key(ids[i])):
-                        print chain_start_hash
+                    if(ids[i] not in chain_start_hash):
+                        print(chain_start_hash)
                         raise Exception("problem, found link end without a start")
 
 
@@ -486,7 +492,7 @@ class coreference_tagged_sentence:
 
                         self.links.append(a_link)
 
-                        if(not self.chain_hash.has_key(ids[i])):
+                        if(ids[i] not in self.chain_hash):
                             self.chain_hash[ids[i]] = []
 
                         self.chain_hash[ids[i]].append(a_link)
@@ -606,9 +612,9 @@ def main():
                 part_number=bits[-1]
 
                 if(part_number != "000"):
-                    print '</TEXT>\n<TEXT PARTNO="%s">' % (part_number)
+                    print('</TEXT>\n<TEXT PARTNO="%s">' % (part_number))
                 else:
-                    print '<DOC DOCNO="%s">\n<TEXT PARTNO="%s">' % (expand_document_id(document_id, o_options.LANGUAGE), part_number)
+                    print('<DOC DOCNO="%s">\n<TEXT PARTNO="%s">' % (expand_document_id(document_id, o_options.LANGUAGE), part_number))
 
             elif(file_line.startswith("#end")):
                 pass
@@ -617,7 +623,7 @@ def main():
                 sentence_index = sentence_index + 1
                 #print "sentence:", sentence_index
                 a_coreference_tagged_sentence = coreference_tagged_sentence(r_c_matrix)
-                print a_coreference_tagged_sentence
+                print(a_coreference_tagged_sentence)
                 r_c_matrix = []
 
             else:
@@ -631,7 +637,7 @@ def main():
 
             file_line = file.readline()
 
-        print "</TEXT>\n</DOC>"
+        print("</TEXT>\n</DOC>")
 
         #---- close the file ----#
         if(file != sys.stdin):
@@ -639,4 +645,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

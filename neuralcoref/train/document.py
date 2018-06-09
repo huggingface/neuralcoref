@@ -741,6 +741,7 @@ def mention_detection_debug(sentence):
         print(mention)
 
 if __name__ == '__main__':
+    import sys
     if len(sys.argv) > 1:
         sent = sys.argv[1]
         mention_detection_debug(sent)

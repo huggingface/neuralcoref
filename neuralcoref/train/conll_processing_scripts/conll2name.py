@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 #---- standard library imports ----#
+from __future__ import print_function
 import sys
 
 # version check
@@ -473,7 +474,7 @@ def main():
                 bits = file_line.split()
                 document_id=bits[2].replace("(", "").replace(");","")
                 if(first_begin == True):
-                    print '''<DOC DOCNO="%s">''' % (expand_document_id(document_id, o_options.LANGUAGE))
+                    print('''<DOC DOCNO="%s">''' % (expand_document_id(document_id, o_options.LANGUAGE)))
                     first_begin = False
 
             elif(file_line.startswith("#end")):
@@ -481,7 +482,7 @@ def main():
 
             elif(file_line == ""):
                 a_name_tagged_sentence = name_tagged_sentence(r_c_matrix)
-                print a_name_tagged_sentence
+                print(a_name_tagged_sentence)
                 r_c_matrix = []
 
             else:
@@ -494,7 +495,7 @@ def main():
                     r_c_matrix.append([word, encoded_name])
 
             file_line = file.readline()
-        print "</DOC>"
+        print("</DOC>")
 
         #---- close the file ----#
         if(file != sys.stdin):

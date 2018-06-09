@@ -7,9 +7,9 @@ is_windows = sys.platform.startswith('win')
 is_linux = sys.platform.startswith('linux')
 is_osx = sys.platform == 'darwin'
 
-if is_python2:
+try:
+    unicode_ = unicode  # Python 2
     bytes_ = str
-    unicode_ = unicode
     string_types = (str, unicode)
     chr_ = unichr
 
@@ -19,9 +19,9 @@ if is_python2:
     def bytes_to_unicode(b, encoding='utf8', errors='strict'):
         return unicode_(b, encoding=encoding, errors=errors)
 
-else:
+except NameError:
+    unicode_ = str      # Python 3
     bytes_ = bytes
-    unicode_ = str
     string_types = (bytes, str)
     chr_ = chr
 
