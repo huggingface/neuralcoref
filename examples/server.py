@@ -4,15 +4,18 @@
 A simple server serving the coreference system.
 """
 from __future__ import unicode_literals
+from __future__ import print_function
 
-import sys
 import json
 from wsgiref.simple_server import make_server
 import falcon
 import spacy
 
-IS_PYTHON2 = int(sys.version[0]) == 2
-unicode_ = unicode if IS_PYTHON2 else str
+try:
+    unicode_ = unicode  # Python 2
+except NameError:
+    unicode_ = str      # Python 3
+
 
 class AllResource(object):
     def __init__(self):

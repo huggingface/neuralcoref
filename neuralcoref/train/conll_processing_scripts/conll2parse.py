@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 #---- standard library imports ----#
+from __future__ import print_function
 import sys
 
 # version check
@@ -21,10 +22,10 @@ import collections
 import ConfigParser
 from optparse import OptionParser
 
-
-
-
-
+try:
+    xrange          # Python 2
+except NameError:
+    xrange = range  # Python 3
 
 
 
@@ -520,7 +521,7 @@ def main():
 
             elif(file_line == ""):
                 a_parsed_sentence = parsed_sentence(r_c_matrix)
-                print a_parsed_sentence
+                print(a_parsed_sentence)
                 r_c_matrix = []
 
             else:
@@ -540,4 +541,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
