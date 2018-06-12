@@ -3,7 +3,7 @@ NeuralCoref: Coreference Resolution in spaCy with Neural Networks.
 
 NeuralCoref is a pipeline extension for spaCy 2.0 that annotates and resolves coreference clusters. NeuralCoref is based on a neural network model, production-ready, integrated in spaCy's NLP pipeline and easily extensible to new training datasets.
 
-For a brief introduction to coreference resolution and NeuralCoref, please refere to our `blog post <https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30>`_.
+For a brief introduction to coreference resolution and NeuralCoref, please refer to our `blog post <https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30>`_.
 NeuralCoref is written in Python/Cython and comes with pre-trained statistical models for English. It can be trained in other languages. NeuralCoref is accompanied by a visualization client `NeuralCoref-Viz <https://github.com/huggingface/neuralcoref-viz>`_, a web interface  powered by a REST server that can be `tried online <https://huggingface.co/coref/>`_. NeuralCoref is released under the MIT license.
 
 
