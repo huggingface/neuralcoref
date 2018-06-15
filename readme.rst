@@ -15,6 +15,9 @@ NeuralCoref is written in Python/Cython and comes with pre-trained statistical m
 .. image:: https://img.shields.io/badge/made%20with%20❤%20and-spaCy-09a3d5.svg
     :target: https://spacy.io
     :alt: spaCy
+.. image:: https://travis-ci.org/huggingface/neuralcoref.svg?branch=master
+    :target: https://travis-ci.org/huggingface/neuralcoref
+    :alt: Travis-CI
 
 .. image:: https://huggingface.co/coref/assets/thumbnail-large.png
     :target: https://huggingface.co/coref/
