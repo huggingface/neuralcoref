@@ -1,5 +1,11 @@
 group: travis_latest
 language: python
+env:
+    - REPO=huggingface/100-times-faster-nlp
+    - REPO=huggingface/awd-lstm-lm
+    - REPO=huggingface/neuralcoref  # has .travis.yml file
+    - REPO=huggingface/pytorch-openai-transformer-lm
+    - REPO=huggingface/torchMoji
 cache: pip
 python:
     - 2.7
@@ -9,19 +15,24 @@ python:
     #- pypy3
 matrix:
     allow_failures:
-        - python: nightly
+        - python: 2.7
         - python: pypy
         - python: pypy3
 install:
     #- pip install -r requirements.txt
-    - pip install flake8  # pytest  # add another testing frameworks later
+    - pip install flake8  # pytest  # add other testing frameworks later
 before_script:
-    # stop the build if there are Python syntax errors or undefined names
-    - flake8 . --count --select=E901,E999,F821,F822,F823 --show-source --statistics
-    # exit-zero treats all errors as warnings.  The GitHub editor is 127 chars wide
-    - flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - URL=https://github.com/${REPO}
+    - echo ; echo -n "flake8 testing of ${URL} on " ; python -V
+    - git clone --depth=50 ${URL} ~/${REPO}  # --branch=master
+    - cd ~/${REPO}
 script:
-    - true  # pytest --capture=sys  # add other tests here
+    - echo stop the build if there are Python syntax errors or undefined names
+    - echo ; echo -n "flake8 testing of ${URL} on " ; python -V
+    - time flake8 . --count --select=E901,E999,F821,F822,F823 --show-source --statistics
+    - echo exit-zero treats all errors as warnings.  The GitHub editor is 127 chars wide
+    - time flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    #- true  # pytest --capture=sys
 notifications:
     on_success: change
     on_failure: change  # `always` will be the setting once code changes slow down
