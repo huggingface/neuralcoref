@@ -69,6 +69,7 @@ environment to avoid modifying system state:
     source .env/bin/activate
     pip install MODEL_URL
 
+You will also need to install the NeuralCoref library as described below.
 
 Install NeuralCoref from source
 -------------------------------
