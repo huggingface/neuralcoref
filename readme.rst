@@ -152,7 +152,7 @@ The ``Cluster`` class also implements a few Python class methods to simplify the
 Examples
 --------
 
-Here are some example on how you can navigate the coreference cluster chains.
+Here are a few examples on how you can navigate the coreference cluster chains and display clusters and mentions.
 
 .. code:: python
 
@@ -173,6 +173,10 @@ Here are some example on how you can navigate the coreference cluster chains.
     span._.is_coref
     span._.coref_cluster.main
     span._.coref_cluster.main._.coref_cluster
+
+**Important**: NeuralCoref mentions are spaCy `Span objects <https://spacy.io/api/span>`_ which means you can access all the usual `Span attributes <https://spacy.io/api/span#attributes>`_ like ``span.start`` (index of the first token of the span in the document), ``span.end`` (index of the first token after the span in the document), etc...
+
+Ex: ``doc._.coref_clusters[1].mentions[-1].start`` will give you the index of the first token of the last mention of the second coreference cluster in the document.
 
 Using NeuralCoref as a server
 =============================
