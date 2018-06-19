@@ -281,7 +281,12 @@ cdef (int, int) enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end,
     cdef uint32_t maxchild_idx
     minchild_idx = i
     maxchild_idx = i
+    # if debug: print("enlarge_span")
+    # if debug: print("test", test)
+    # if debug: print("sent_start", sent_start)
+    # if debug: print("sent_end", sent_end)
     for j in range(sent_start, sent_end):
+        # if debug: print("j", j)
         c = doc_c[j]
         c_head = j + c.head
         if c_head != i:
@@ -293,6 +298,7 @@ cdef (int, int) enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end,
                 or (test == 2 and c.head == i and not inside(c.dep, hashes.conj_or_prep)):
             minchild_idx = c.l_edge
     for j in range(sent_start, sent_end):
+        # if debug: print("j", j)
         c = doc_c[j]
         c_head = j + c.head
         if c_head != i:
@@ -303,19 +309,28 @@ cdef (int, int) enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end,
                 or (test == 1 and inside(c.dep, hashes.nsubj_or_dep)) \
                 or (test == 2 and c.head == i and not inside(c.dep, hashes.conj_or_prep)):
             maxchild_idx = c.r_edge
+    # if debug: print("minchild_idx", minchild_idx)
+    # if debug: print("maxchild_idx", maxchild_idx)
+    # if debug: print("Clean up endings and begginging")
     # Clean up endings and begginging
-    while maxchild_idx >= minchild_idx \
+    while maxchild_idx >= minchild_idx and maxchild_idx > sent_start \
           and (inside(doc_c[maxchild_idx].pos, hashes.remove_pos)
                or inside(doc_c[maxchild_idx].lex.lower, hashes.lower_not_end)):
+        # if debug: print("maxchild_idx", maxchild_idx)
         maxchild_idx -= 1 # We don't want mentions finishing with 's or conjunctions/punctuation
-    while minchild_idx <= maxchild_idx and (inside(doc_c[minchild_idx].pos, hashes.remove_pos) 
-                                        or inside(doc_c[minchild_idx].lex.lower, hashes.lower_not_end)):
+    # if debug: print("maxchild_idx", maxchild_idx)
+    while minchild_idx <= maxchild_idx and minchild_idx < sent_end - 1 \
+          and (inside(doc_c[minchild_idx].pos, hashes.remove_pos) 
+               or inside(doc_c[minchild_idx].lex.lower, hashes.lower_not_end)):
         minchild_idx += 1 # We don't want mentions starting with 's or conjunctions/punctuation
+        # if debug: print("minchild_idx", minchild_idx)
+    # if debug: print("minchild_idx", minchild_idx)
     return minchild_idx, maxchild_idx + 1
 
 cdef bint add_span(int start, int end, SentSpans* mentions_spans, TokenC* doc_c) nogil:
     ''' Utility function to add a detected mention to our SentSpans structure '''
     cdef int num = mentions_spans.num
+    # if debug: print("add_span")
     mentions_spans.spans[num].start = start
     mentions_spans.spans[num].end = end
     mentions_spans.num += 1
@@ -327,13 +342,17 @@ cdef void _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSp
     cdef int i, j, c_head, k, endIdx, minchild_idx, maxchild_idx, n_spans
     cdef bint test
     for i in range(sent_start, sent_end):
+        # if debug: print("token", i)
         token = doc_c[i]
         if blacklist and inside(token.lex.lower, hashes.no_coref_list):
+            # if debug: print("blacklist")
             continue
         if (not inside(token.tag, hashes.keep_tags) or inside(token.dep, hashes.leave_dep) \
             and not inside(token.dep, hashes.keep_dep)):
+            # if debug: print("not in keep tags or deps")
             continue
         if inside(token.tag, hashes.PRP_tags): # pronoun
+            # if debug: print("pronoun")
             endIdx = i + 1
             test = add_span(i, i+1, mentions_spans, doc_c)
             if test: return
@@ -343,7 +362,9 @@ cdef void _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSp
                 if test: return
             continue
         # Add NP mention
+        # if debug: print("NP mention")
         if token.lex.lower == hashes.POSSESSIVE_MARK: # Take care of 's
+            # if debug: print("Take care of 's")
             c_head = i + token.head
             j = 0
             while c_head != 0 and j < MAX_ITER:
@@ -355,14 +376,17 @@ cdef void _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSp
                 c_head += doc_c[c_head].head
                 j += 1
             continue
+        # if debug: print("Enlarge span")
         for j in range(sent_start, sent_end):
             c = doc_c[j]
         start, end = enlarge_span(doc_c, i, sent_start, sent_end, 0, hashes)
         if token.tag == hashes.IN_TAG and token.dep == hashes.MARK_DEP and start == end:
             start, end = enlarge_span(doc_c, i + token.head, sent_start, sent_end, 0, hashes)
         if start == end:
+            # if debug: print("Empty span")
             continue
         if doc_c[start].lex.lower == hashes.POSSESSIVE_MARK:
+            # if debug: print("we probably already have stored this mention")
             continue # we probably already have stored this mention
         test = add_span(start, end, mentions_spans, doc_c)
         if test: return
@@ -372,6 +396,7 @@ cdef void _extract_from_sent(TokenC* doc_c, int sent_start, int sent_end, SentSp
                 test = True
                 break
         if test:
+            # if debug: print("conj_or_prep")
             start, end = enlarge_span(doc_c, i, sent_start, sent_end, 0, hashes)
             if start == end:
                 continue
@@ -389,13 +414,16 @@ cdef extract_mentions_spans(Doc doc, HashesList hashes, bint blacklist=False):
         Pool mem = Pool()
     mentions_spans = list(ent for ent in doc.ents if ent.label_ in ACCEPTED_ENTS) # Named entities
     n_sents = len(list(doc.sents))
+    # if debug: print("n_sents", n_sents)
     sent_spans = <SentSpans*>mem.alloc(n_sents, sizeof(SentSpans))
     for i, sent in enumerate(doc.sents):
         max_spans = len(sent)*SPAN_FACTOR
         sent_spans[i].spans = <SpanC*>mem.alloc(max_spans, sizeof(SpanC))
         sent_spans[i].max_spans = max_spans
         sent_spans[i].num = 0
+        # if debug: print("sent", i, "max_spans", max_spans)
     for i, sent in enumerate(doc.sents): # Extract spans from each sentence in the doc (nogil so could be parallelized)
+        # if debug: print("extact from", i)
         _extract_from_sent(doc.c, sent.start, sent.end, &sent_spans[i], hashes, blacklist=blacklist)
     spans_set = set()
     for m in mentions_spans:
@@ -583,10 +611,11 @@ cdef class NeuralCoref(object):
             StringStore strings
         #    timespec ts
         #    double timing0, timing1, timing2, timing3, timing4
-        # clock_gettime(CLOCK_REALTIME, &ts)
-        # timing0 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+        #    clock_gettime(CLOCK_REALTIME, &ts)
+        #    timing0 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
 
         annotations = []
+        # if debug: print("Extract mentions")
         for doc in docs:
             mem = Pool() # We use this for doc specific allocation
             strings = doc.vocab.strings
@@ -614,6 +643,7 @@ cdef class NeuralCoref(object):
                 for j, w in enumerate(content_words[-1]):
                     c[i].content_words.arr[j] = strings.add(w)
 
+            # if debug: print("Prepare arrays of pairs indices and features for feeding the model")
             # ''' Prepare arrays of pairs indices and features for feeding the model '''
             pairs_ant = []
             pairs_men = []
@@ -649,6 +679,7 @@ cdef class NeuralCoref(object):
             p_inp_arr = numpy.zeros((n_pairs, SIZE_PAIR_IN_NO_GENRE + SIZE_GENRE), dtype='float32')
             p_inp = p_inp_arr
 
+            # if debug: print("Build single features and pair features arrays")
             # ''' Build single features and pair features arrays '''
             doc_c = doc.c
             doc_embedding = numpy.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
@@ -688,6 +719,7 @@ cdef class NeuralCoref(object):
                 p_inp[i, PAIR_FEATS_7:PAIR_FEATS_8] = s_inp[men_idx, SGNL_FEATS_0:SGNL_FEATS_5] # 10_M2Features
                 # 11_DocGenre is zero currently
 
+            # if debug: print("Compute scores")
             # ''' Compute scores '''
             best_score_ar = numpy.empty((n_mentions), dtype='float32')
             best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
@@ -705,6 +737,7 @@ cdef class NeuralCoref(object):
                     best_score[men_idx] = score[i, 0]
                     best_ant[men_idx] = ant_idx
 
+            # if debug: print("Build clusters")
             # ''' Build clusters '''
             mention_to_cluster = list(range(n_mentions))
             cluster_to_main = list(range(n_mentions))

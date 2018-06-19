@@ -1,6 +1,7 @@
 # NeuralCoref
 /neuralcoref/train/runs/*
 /models/
+/data/
 
 # Cython / C extensions
 cythonize.json
