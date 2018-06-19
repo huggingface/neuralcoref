@@ -50,22 +50,26 @@ def package(input_dir, output_dir, meta_path=None, create_meta=False,
     model_name_v = model_name + '-' + meta['version']
     main_path = output_path / model_name_v
     package_path = main_path / model_name
+    bin_path = main_path / 'bin'
+    include_path = main_path / 'include'
 
     create_dirs(package_path, force)
+    create_dirs(bin_path, force)
+
     shutil.copytree(path2str(input_path),
                     path2str(package_path / model_name_v))
-    include_path = path2str(Path(__file__).parent / 'include')
-    shutil.copytree(path2str(include_path),
-                    path2str(package_path / model_name_v / 'include'))
+    orig_include_path = path2str(Path(__file__).parent / 'include')
+    shutil.copytree(path2str(orig_include_path),
+                    path2str(include_path))
     nc1_path = path2str(Path(__file__).parent.parent / 'neuralcoref.pyx')
     shutil.copyfile(path2str(nc1_path),
-                    path2str(package_path / model_name_v / 'neuralcoref.pyx'))
+                    path2str(package_path / 'neuralcoref.pyx'))
     nc2_path = path2str(Path(__file__).parent.parent / 'neuralcoref.pxd')
     shutil.copyfile(path2str(nc2_path),
-                    path2str(package_path / model_name_v / 'neuralcoref.pxd'))
-    cy_path = path2str(Path(__file__).parent.parent / 'bin' / 'cythonize.py')
-    shutil.copyfile(path2str(cy_path),
-                    path2str(package_path / model_name_v / 'bin' / 'cythonize.py'))
+                    path2str(package_path / 'neuralcoref.pxd'))
+    orig_bin_path = path2str(Path(__file__).parent.parent.parent / 'bin' / 'cythonize.py')
+    shutil.copyfile(path2str(orig_bin_path),
+                    path2str(bin_path / 'cythonize.py'))
     create_file(main_path / 'meta.json', json_dumps(meta))
     create_file(main_path / 'setup.py', TEMPLATE_SETUP)
     create_file(main_path / 'MANIFEST.in', TEMPLATE_MANIFEST)
