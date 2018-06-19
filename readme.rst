@@ -1,7 +1,7 @@
-NeuralCoref: Coreference Resolution in spaCy with Neural Networks.
+✨NeuralCoref: Coreference Resolution in spaCy with Neural Networks.
 *******************************************************************
 
-NeuralCoref is a pipeline extension for spaCy 2.0 that annotates and resolves coreference clusters. NeuralCoref is based on a neural network model, production-ready, integrated in spaCy's NLP pipeline and easily extensible to new training datasets.
+NeuralCoref is a pipeline extension for spaCy 2.0 that annotates and resolves coreference clusters using a neural network. NeuralCoref is production-ready, integrated in spaCy's NLP pipeline and easily extensible to new training datasets.
 
 For a brief introduction to coreference resolution and NeuralCoref, please refer to our `blog post <https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30>`_.
 NeuralCoref is written in Python/Cython and comes with pre-trained statistical models for English. It can be trained in other languages. NeuralCoref is accompanied by a visualization client `NeuralCoref-Viz <https://github.com/huggingface/neuralcoref-viz>`_, a web interface  powered by a REST server that can be `tried online <https://huggingface.co/coref/>`_. NeuralCoref is released under the MIT license.
@@ -30,7 +30,7 @@ Install NeuralCoref
 As a pre-trained spaCy model
 ----------------------------
 
-This is the easiest way to install NeuralCoref, if you don't need to train the model on a new language or dataset.
+This is the easiest way to install NeuralCoref if you don't need to train the model on a new language or dataset.
 
 ==================== ===
 **Operating system** macOS / OS X, Linux, Windows (Cygwin, MinGW, Visual Studio)
@@ -42,7 +42,7 @@ NeuralCoref is currently available in English with three models of increasing ac
 ================== =================== =============== ====================================================
 **Model Name**     **MODEL_URL**       **Size**        **Description**
 en_coref_sm        `en_coref_sm`_      78 Mo           A *small* English model based on spaCy `en_core_web_sm-2.0.0`_
-en_coref_md        `en_coref_md`_      161 Mo          [Default] A *medium* English model based on spaCy `en_core_web_md-2.0.0`_ 
+en_coref_md        `en_coref_md`_      161 Mo          [Recommended] A *medium* English model based on spaCy `en_core_web_md-2.0.0`_ 
 en_coref_lg        `en_coref_lg`_      893 Mo          A *large* English model based on spaCy `en_core_web_lg-2.0.0`_
 ================== =================== =============== ====================================================
 
@@ -106,7 +106,6 @@ You can also ``import`` NeuralCoref model directly and call its ``load()`` metho
 
 .. code:: python
 
-    import spacy
     import en_coref_md
 
     nlp = en_coref_md.load()
