@@ -199,8 +199,8 @@ def generate_cython(root, source):
         raise RuntimeError('Running cythonize failed')
 
 
-def is_source_release(path):
-    return os.path.exists(os.path.join(path, '/neuralcoref/neuralcoref.cpp'))
+def is_source_release(model_path):
+    return os.path.exists(os.path.join(model_path, 'neuralcoref/neuralcoref.cpp'))
 
 
 def setup_package():
@@ -268,6 +268,7 @@ if __name__ == '__main__':
 TEMPLATE_MANIFEST = """
 include meta.json
 recursive-include include *.h
+recursive-include bin *.py
 """.strip()
 
 
