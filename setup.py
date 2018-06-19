@@ -52,11 +52,11 @@ def setup_package():
 
         include_dirs = [
             get_python_inc(plat_specific=True),
-            os.path.join(root, 'include')]
+            os.path.join(root, 'neuralcoref', 'cli', 'include')]
 
         if (ccompiler.new_compiler().compiler_type == 'msvc'
             and msvccompiler.get_build_version() == 9):
-            include_dirs.append(os.path.join(root, 'include', 'msvc9'))
+            include_dirs.append(os.path.join(root, 'neuralcoref', 'cli', 'include', 'msvc9'))
 
         ext_modules = []
         for mod_name in MOD_NAMES:
@@ -68,7 +68,7 @@ def setup_package():
             if sys.platform == 'darwin':
                 dylib_path = ['..' for _ in range(mod_name.count('.'))]
                 dylib_path = '/'.join(dylib_path)
-                dylib_path = '@loader_path/%s/spacy/platform/darwin/lib' % dylib_path
+                dylib_path = '@loader_path/%s/neuralcoref/platform/darwin/lib' % dylib_path
                 extra_link_args.append('-Wl,-rpath,%s' % dylib_path)
             ext_modules.append(
                 Extension(mod_name, [mod_path],
