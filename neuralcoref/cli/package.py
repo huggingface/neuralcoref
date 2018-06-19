@@ -52,28 +52,37 @@ def package(input_dir, output_dir, meta_path=None, create_meta=False,
     package_path = main_path / model_name
     bin_path = main_path / 'bin'
     include_path = main_path / 'include'
+    orig_nc_path = Path(__file__).parent.parent
+    nc_path = package_path / 'neuralcoref'
 
     create_dirs(package_path, force)
     create_dirs(bin_path, force)
+    create_dirs(nc_path, force)
 
     shutil.copytree(path2str(input_path),
                     path2str(package_path / model_name_v))
+
     orig_include_path = path2str(Path(__file__).parent / 'include')
     shutil.copytree(path2str(orig_include_path),
                     path2str(include_path))
-    nc1_path = path2str(Path(__file__).parent.parent / 'neuralcoref.pyx')
+
+    nc1_path = path2str(orig_nc_path / 'neuralcoref.pyx')
+    nc2_path = path2str(orig_nc_path / 'neuralcoref.pxd')
     shutil.copyfile(path2str(nc1_path),
-                    path2str(package_path / 'neuralcoref.pyx'))
-    nc2_path = path2str(Path(__file__).parent.parent / 'neuralcoref.pxd')
+                    path2str(nc_path / 'neuralcoref.pyx'))
     shutil.copyfile(path2str(nc2_path),
-                    path2str(package_path / 'neuralcoref.pxd'))
+                    path2str(nc_path / 'neuralcoref.pxd'))
+    create_file(nc_path / '__init__.py', TEMPLATE_INIT_NC)
+    create_file(nc_path / '__init__.pxd', TEMPLATE_INIT_PXD)
+
     orig_bin_path = path2str(Path(__file__).parent.parent.parent / 'bin' / 'cythonize.py')
     shutil.copyfile(path2str(orig_bin_path),
                     path2str(bin_path / 'cythonize.py'))
+
     create_file(main_path / 'meta.json', json_dumps(meta))
     create_file(main_path / 'setup.py', TEMPLATE_SETUP)
     create_file(main_path / 'MANIFEST.in', TEMPLATE_MANIFEST)
-    create_file(package_path / '__init__.py', TEMPLATE_INIT)
+    create_file(package_path / '__init__.py', TEMPLATE_INIT.format(model_name))
     create_file(package_path / '__init__.pxd', TEMPLATE_INIT_PXD)
     prints(main_path, Messages.M043,
            title=Messages.M042.format(name=model_name_v))
@@ -136,6 +145,7 @@ from os import path, walk
 import json
 import sys
 import contextlib
+import subprocess
 from shutil import copy
 from distutils.sysconfig import get_python_inc
 from distutils import ccompiler, msvccompiler
@@ -181,7 +191,7 @@ def chdir(new_dir):
 
 
 def generate_cython(root, source):
-    print('Cythonizing sources')
+    print('Cythonizing sources in', source)
     p = subprocess.call([sys.executable,
                          os.path.join(root, 'bin', 'cythonize.py'),
                          source], env=os.environ)
@@ -190,16 +200,13 @@ def generate_cython(root, source):
 
 
 def is_source_release(path):
-    return os.path.exists(os.path.join(path, 'PKG-INFO'))
+    return os.path.exists(os.path.join(path, '/neuralcoref/neuralcoref.cpp'))
 
 
 def setup_package():
     root = path.abspath(path.dirname(__file__))
 
     with chdir(root):
-        if not is_source_release(root):
-            generate_cython(root, 'neuralcoref')
-
         meta_path = path.join(root, 'meta.json')
         meta = load_meta(meta_path)
         model_name = str(meta['lang'] + '_' + meta['name'])
@@ -214,7 +221,7 @@ def setup_package():
             include_dirs.append(os.path.join(root, 'include', 'msvc9'))
 
         ext_modules = []
-        mod_name = model_name + '/neuralcoref'
+        mod_name = model_name + '.neuralcoref.neuralcoref'
         mod_path = mod_name.replace('.', '/') + '.cpp'
         extra_link_args = []
         # ???
@@ -230,6 +237,8 @@ def setup_package():
                 language='c++', include_dirs=include_dirs,
                 extra_link_args=extra_link_args))
 
+        if not is_source_release(model_name):
+            generate_cython(root, model_name)
 
         copy(meta_path, path.join(model_name))
         copy(meta_path, model_dir)
@@ -259,7 +268,7 @@ if __name__ == '__main__':
 TEMPLATE_MANIFEST = """
 include meta.json
 recursive-include include *.h
-pyth""".strip()
+""".strip()
 
 
 TEMPLATE_INIT = """
@@ -268,7 +277,7 @@ from __future__ import unicode_literals
 
 from pathlib import Path
 from spacy.util import load_model_from_init_py, get_model_meta
-from .neuralcoref import NeuralCoref
+from {}.neuralcoref import NeuralCoref
 
 __version__ = get_model_meta(Path(__file__).parent)['version']
 
@@ -281,6 +290,10 @@ def load(**overrides):
     coref.from_disk(nlp.path / 'neuralcoref')
     nlp.add_pipe(coref, name='neuralcoref')
     return nlp
+""".strip()
+
+TEMPLATE_INIT_NC = """
+from .neuralcoref import NeuralCoref
 """.strip()
 
 TEMPLATE_INIT_PXD = """
