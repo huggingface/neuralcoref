@@ -523,13 +523,15 @@ cdef class NeuralCoref(object):
         self.conv_dict = None
 
         # Register attributes on Doc and Span
-        Doc.set_extension('has_coref', default=False)
-        Doc.set_extension('coref_clusters', default=None)
-        Doc.set_extension('coref_resolved', default="")
-        Span.set_extension('is_coref', default=False)
-        Span.set_extension('coref_cluster', default=None)
-        Token.set_extension('in_coref', getter=self.token_in_coref)
-        Token.set_extension('coref_clusters', getter=self.token_clusters)
+        if not Doc.has_extension('huggingface_neuralcoref'):
+            Doc.set_extension('huggingface_neuralcoref', default=True)
+            Doc.set_extension('has_coref', default=False)
+            Doc.set_extension('coref_clusters', default=None)
+            Doc.set_extension('coref_resolved', default="")
+            Span.set_extension('is_coref', default=False)
+            Span.set_extension('coref_cluster', default=None)
+            Token.set_extension('in_coref', getter=self.token_in_coref)
+            Token.set_extension('coref_clusters', getter=self.token_clusters)
 
     def __reduce__(self):
         return (NeuralCoref, (self.vocab, self.model), None, None)
