@@ -8,6 +8,20 @@ This coreference resolution module is based on the super fast [spaCy](https://sp
 Be sure to check out [our medium post](https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30) in which we talk more about neuralcoref and coreference resolution.
 
 ## Installation
+Method #1
+It's available to install neuralcoref package from Anaconda.org:
+In Terminal window or Anaconda Prompt, run:
+
+```
+conda install -c laed neuralcoref
+```
+To check that package is installed:
+```
+conda list
+```
+
+
+Method #2
 Clone the repo (the trained model weights are too large for PyPI)
 
 ```
