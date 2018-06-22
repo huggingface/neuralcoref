@@ -173,6 +173,8 @@ class Coref:
                 self._merge_coreference_clusters(best_ant[mention_idx], mention_idx)
         return (n_ant, best_ant)
 
+
+
     def run_coref_on_utterances(self, last_utterances_added=False, follow_chains=True):
         ''' Run the coreference model on some utterances
 

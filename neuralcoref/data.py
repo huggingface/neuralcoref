@@ -390,13 +390,13 @@ class EmbeddingExtractor:
         ''' Embedding for a list of words '''
         embed_vector = np.zeros(self.shape) #We could also use np.copy(self.average_mean)
         word_list = []
-        for tok in token_list:
+        '''for tok in token_list:
             if tok.lower_ not in [".", "!", "?"]:
                 word, embed = self.get_word_embedding(tok, static=True)
                 embed_vector += embed
                 word_list.append(word)
         return word_list, (embed_vector/max(len(word_list), 1))
-
+        '''
     def get_mention_embeddings(self, mention, doc_embedding):
         ''' Embedding for a mention '''
         sent = mention.sent
@@ -433,6 +433,23 @@ class EmbeddingExtractor:
                 words_embeddings_,
                 np.concatenate(list(em[1] for em in spans), axis=0)[: np.newaxis],
                 np.concatenate(list(em[1] for em in words), axis=0)[: np.newaxis])
+
+    def lda_algi(self, tokens):
+        embed_vector = np.zeros(self.shape)
+        mention = []
+        for i in mention.enumerate():
+            mention.append(tokens)
+        word_list = []
+        for tok in tokens:
+            if tok.lower_ not in [".", "!", "?"]:
+                new_word, embed = self.get_word_embedding(tok, static=True)
+                embed_vector += embed_vector
+                word_list.append(new_word)
+                #words = [self.get_word_embedding(extract_mentions_spans(mention.start-1))]
+        return word_list, (embed_vector/max(len(word_list), 1))
+
+
+
 
 class Data:
     '''
