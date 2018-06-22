@@ -1,0 +1,27 @@
+package:
+  name: neuralcoref
+  version: "3.0"
+
+source:
+  git_url: https://github.com/huggingface/neuralcoref.git
+
+requirements:
+  build:
+    - python
+    - setuptools
+  run:
+    - numpy
+    - openblas
+    - python
+    - spacy
+    - falcon
+    - pathlib
+    - python-mimeparse
+ 
+test:
+  imports:
+    - neuralcoref
+
+about:
+  home: /home/craft-3/repos/neuralcoref
+  license: BSD

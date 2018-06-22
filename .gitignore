@@ -1,19 +1,64 @@
-*.pyc
-*#*
-*.DS_STORE
-*.log
-*Data.fs*
-*flymake*
-dist/*
-*egg*
-urllist*
-build/
-__pycache__/
+# NeuralCoref
+/neuralcoref/train/runs/*
+/models/
+/data/
+
+# Cython / C extensions
+cythonize.json
+neuralcoref/*.html
+*.cpp
+*.so
+
+# Vim / VSCode / editors
+*.swp
+*.sw*
+Profile.prof
+.vscode
+.sass-cache
+
+# Python
 /.Python
-/bin/
-/include/
-/lib/
-/pip-selfcheck.json
-neuralcoref/data/*
-neuralcoref/train/*
-.cache
+.python-version
+__pycache__/
+*.py[cod]
+.env/
+.env*
+.~env/
+.venv
+venv/
+.dev
+.denv
+.pypyenv
+
+# Temporary files
+*.~*
+tmp/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Distribution / packaging
+env/
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.eggs
+MANIFEST
+
+# Windows
+*.bat
+Thumbs.db
+Desktop.ini
+
+# Mac OS X
+*.DS_Store
