@@ -448,8 +448,8 @@ class Cluster:
     """ A utility class to store our annotations in the spaCy Doc """
     def __init__(self, i, main, mentions):
         self.i = i
-        self.main = main
-        self.mentions = mentions
+        self.main = main # A Spacy Span: main mention of the cluster
+        self.mentions = mentions # A list of Spacy Spans: list of all mentions in the cluster
 
     def __getitem__(self, i):
         return self.mentions[i]
@@ -474,6 +474,7 @@ class Cluster:
 
     def __repr__(self):
         return self.__str__()
+
 
 cdef class NeuralCoref(object):
     """ spaCy v2.0 Coref pipeline component """
@@ -514,6 +515,8 @@ cdef class NeuralCoref(object):
             cfg['max_dist_match'] = util.env_opt('max_dist_match', 500)
         if 'blacklist' not in cfg:
             cfg['blacklist'] = util.env_opt('blacklist', True)
+        if 'store_scores' not in cfg:
+            cfg['store_scores'] = util.env_opt('store_scores', True)
         if 'conv_dict' not in cfg:
             cfg['conv_dict'] = util.env_opt('conv_dict', None)
         self.cfg = cfg
@@ -528,10 +531,15 @@ cdef class NeuralCoref(object):
             Doc.set_extension('has_coref', default=False)
             Doc.set_extension('coref_clusters', default=None)
             Doc.set_extension('coref_resolved', default="")
+            Doc.set_extension('coref_scores', default=None)
+
             Span.set_extension('is_coref', default=False)
             Span.set_extension('coref_cluster', default=None)
+            Span.set_extension('coref_scores', default=None)
+
             Token.set_extension('in_coref', getter=self.token_in_coref)
             Token.set_extension('coref_clusters', getter=self.token_clusters)
+            Token.set_extension('coref_scores', getter=self.token_scores)
 
     def __reduce__(self):
         return (NeuralCoref, (self.vocab, self.model), None, None)
@@ -608,7 +616,7 @@ cdef class NeuralCoref(object):
             uint64_t [::1] p_ant, p_men, best_ant
             float [::1] embed, feats, doc_embed, mention_embed, best_score
             float [:, ::1] s_inp, p_inp
-            float [:, ::1] score
+            float [:, ::1] s_score, p_score
             Pool mem
             StringStore strings
         #    timespec ts
@@ -727,16 +735,16 @@ cdef class NeuralCoref(object):
             best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
             best_score = best_score_ar
             best_ant = best_ant_ar
-            score = self.model[0](s_inp_arr)
+            s_score = self.model[0](s_inp_arr)
             for i in range(n_mentions):
-                best_score[i] = score[i, 0] - 50 * (greedyness - 0.5)
+                best_score[i] = s_score[i, 0] - 50 * (greedyness - 0.5)
                 best_ant[i] = i
-            score = self.model[1](p_inp_arr)
+            p_score = self.model[1](p_inp_arr)
             for i in range(n_pairs):
                 ant_idx = p_ant[i]
                 men_idx = p_men[i]
-                if score[i, 0] > best_score[men_idx]:
-                    best_score[men_idx] = score[i, 0]
+                if p_score[i, 0] > best_score[men_idx]:
+                    best_score[men_idx] = p_score[i, 0]
                     best_ant[men_idx] = ant_idx
 
             # if debug: print("Build clusters")
@@ -767,7 +775,29 @@ cdef class NeuralCoref(object):
                     main = mentions[cluster_to_main[key]]
                     clusters_list.append(Cluster(i, main, m_list))
                     i += 1
-            annotations.append(clusters_list)
+
+            # Build scores dict
+            scores_dict = {}
+            if self.cfg['store_scores']:
+                # mention scores
+                for i in range(n_mentions):
+                    mention = mentions[i]
+                    score = s_score[i, 0]
+                    if mention in scores_dict:
+                        scores_dict[mention][mention] = score
+                    else:
+                        scores_dict[mention] = {mention: score}
+                # pair scores
+                for i in range(n_pairs):
+                    antecedent = mentions[p_ant[i]]
+                    mention = mentions[p_men[i]]
+                    score = p_score[i, 0]
+                    if mention in scores_dict:
+                        scores_dict[mention][antecedent] = score
+                    else:
+                        scores_dict[mention] = {antecedent: score}
+
+            annotations.append((clusters_list, scores_dict))
 
         return annotations
 
@@ -779,25 +809,27 @@ cdef class NeuralCoref(object):
         if isinstance(docs, Doc):
             docs = [docs]
         cdef Doc doc
-        for doc, clusters in zip(docs, annotations):
-            if len(clusters) != 0:
-                doc._.set('has_coref', True)
-                doc._.set('coref_clusters', clusters)
-                doc._.set('coref_resolved', get_resolved(doc, clusters))
-                for cluster in clusters:
-                    for mention in cluster:
-                        mention._.set('is_coref', True)
-                        mention._.set('coref_cluster', cluster)
+        for doc, (clusters, scores_dict) in zip(docs, annotations):
+            doc._.set('has_coref', len(clusters) != 0)
+            doc._.set('coref_clusters', clusters)
+            doc._.set('coref_resolved', get_resolved(doc, clusters))
+            doc._.set('coref_scores', scores_dict)
+            for cluster in clusters:
+                for mention in cluster:
+                    mention._.set('is_coref', True)
+                    mention._.set('coref_cluster', cluster)
+            for mention, scores in scores_dict.items():
+                mention._.set('coref_scores', scores)
 
     def token_in_coref(self, token):
-        """Getter for Token attributes. Returns True if the token
-        is in a cluster."""
+        """Getter for Token attributes. Returns True if the token is in a cluster.
+        """
         return any([token in mention for cluster in token.doc._.coref_clusters
                     for mention in cluster])
 
     def token_clusters(self, token):
-        """Getter for Token attributes. Returns a list of the cluster in which the token
-        is."""
+        """Getter for Token attributes. Returns a list of the clusters in which the token is.
+        """
         clusters = []
         for cluster in token.doc._.coref_clusters:
             for mention in cluster:
@@ -805,6 +837,15 @@ cdef class NeuralCoref(object):
                     clusters.append(cluster)
                     break
         return clusters
+
+    def token_scores(self, token):
+        """Getter for Token attributes. Returns the scores of the cluster in which the token is.
+        """
+        scores_list = []
+        for mention, scores in token.doc._.coref_scores.items():
+            if token in mention:
+                scores_list.append(scores)
+        return scores_list
 
     def normalize(self, Token token):
         return self.hashes.digit_word if token.is_digit else token.lower
