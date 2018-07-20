@@ -10,7 +10,8 @@ from distutils.sysconfig import get_python_inc
 from distutils import ccompiler, msvccompiler
 from setuptools import Extension, setup, find_packages
 
-PACKAGE_DATA = {'': ['*.pyx', '*.pxd']}
+PACKAGE_DATA = {'': ['*.pyx', '*.pxd'],
+                '': ['*.h'],}
 
 
 PACKAGES = find_packages()
@@ -76,10 +77,9 @@ def setup_package():
                     extra_link_args=extra_link_args))
 
         setup(name='neuralcoref',
-            version='3.0',
-            description="State-of-the-art coreference resolution using neural nets",
+            version='3.1',
+            description="Coreference Resolution in spaCy with Neural Networks",
             url='https://github.com/huggingface/neuralcoref',
-            download_url='https://github.com/huggingface/neuralcoref/archive/3.0.tar.gz',
             author='Thomas Wolf',
             author_email='thomwolf@gmail.com',
             ext_modules=ext_modules,
@@ -92,11 +92,9 @@ def setup_package():
                 'Programming Language :: Python :: 2.7',
                 'Programming Language :: Python :: 3.3',
                 'Programming Language :: Python :: 3.4',
-                'Programming Language :: Python :: 3.5'
+                'Programming Language :: Python :: 3.6'
             ],
-            install_requires=[
-            'spacy',
-            'falcon'],
+            install_requires=['numpy', 'spacy>=2.0.11'],
             packages=PACKAGES,
             package_data=PACKAGE_DATA,
             keywords='NLP chatbots coreference resolution',

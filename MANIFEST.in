@@ -1,3 +1,3 @@
-recursive-include include *.h
-include LICENSE
+recursive-include neuralcoref/cli/include *.h
+include LICENSE.txt
 include README.rst
