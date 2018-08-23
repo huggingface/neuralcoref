@@ -32,11 +32,13 @@ class AllResource(object):
             text = unicode_(text)
             doc = self.nlp(text)
             if doc._.has_coref:
-                mentions = [{'start':    span.start_char,
-                             'end':      span.end_char,
-                             'text':     span.text,
-                             'resolved': span._.coref_main_mention.text
-                            } for span in doc._.coref_mentions]
+                mentions = [{'start':    mention.start_char,
+                             'end':      mention.end_char,
+                             'text':     mention.text,
+                             'resolved': cluster.main.text
+                            }
+                            for cluster in doc._.coref_clusters
+                            for mention in cluster.mentions]
                 clusters = list(list(span.text for span in cluster)
                                 for cluster in doc._.coref_clusters)
                 resolved = doc._.coref_resolved
