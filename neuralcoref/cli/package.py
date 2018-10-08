@@ -285,11 +285,14 @@ __version__ = get_model_meta(Path(__file__).parent)['version']
 
 def load(**overrides):
     disable = overrides.get('disable', [])
-    overrides['disable'] = disable + ['neuralcoref']
-    nlp = load_model_from_init_py(__file__, **overrides)
-    coref = NeuralCoref(nlp.vocab)
-    coref.from_disk(nlp.path / 'neuralcoref')
-    nlp.add_pipe(coref, name='neuralcoref')
+    if 'neuralcoref' in disable:
+        nlp = load_model_from_init_py(__file__, **overrides)
+    else:
+        overrides['disable'] = disable + ['neuralcoref']
+        nlp = load_model_from_init_py(__file__, **overrides)
+        coref = NeuralCoref(nlp.vocab)
+        coref.from_disk(nlp.path / 'neuralcoref')
+        nlp.add_pipe(coref, name='neuralcoref')
     return nlp
 """.strip()
 
