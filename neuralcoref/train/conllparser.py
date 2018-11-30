@@ -662,28 +662,36 @@ class ConllCorpus(object):
                 pickle.dump(gathering_dict[feature], fp)
 
     def save_vocabulary(self, save_path, debug=False):
+        def _vocabulary_to_file(path, vocabulary):
+            print("🌋 Saving vocabulary")
+            with io.open(path, "w", encoding='utf-8') as f:
+                if debug:
+                    print('voc saved in {path}, length: {length}'
+                          .format(path=path, size=len(vocabulary)))
+                for w in tunable_voc:
+                    f.write(w + '\n')
+
         print("🌋 Building tunable vocabulary matrix from static vocabulary")
         tunable_voc = self.embed_extractor.tun_voc
+        _vocabulary_to_file(
+            path=save_path + 'tuned_word_vocabulary.txt',
+            vocabulary=tunable_voc
+        )
 
-        print("🌋 Saving vocabulary")
-        with io.open(save_path+"tuned_word_vocabulary.txt", "w", encoding='utf-8') as f:
-            if debug: print("tunable voc saved in", save_path+"tuned_word_vocabulary.txt", "size", len(tunable_voc))
-            for w in tunable_voc:
-        #                print(w)
-                f.write(w + '\n')
-        # We also save a copy of the static vocabulary (for conll test set scoring)
-        with io.open(save_path+"static_word_vocabulary.txt", "w", encoding='utf-8') as f:
-            if debug: print("static voc saved in", save_path+"static_word_vocabulary.txt", "size", len(tunable_voc))
-            for w in tunable_voc:
-                f.write(w + '\n')
+        static_voc = self.embed_extractor.stat_voc
+        _vocabulary_to_file(
+            path=save_path + 'static_word_vocabulary.txt',
+            vocabulary=static_voc
+        )
 
         tuned_word_embeddings = np.vstack([self.embed_extractor.get_stat_word(w)[1] for w in tunable_voc])
         print("Saving tunable voc, size:", tuned_word_embeddings.shape)
         np.save(save_path + "tuned_word_embeddings", tuned_word_embeddings)
 
-        static_word_embeddings = np.vstack([self.embed_extractor.static_embeddings[w] for w in self.embed_extractor.stat_voc])
+        static_word_embeddings = np.vstack([self.embed_extractor.static_embeddings[w] for w in static_voc])
         print("Saving static voc, size:", static_word_embeddings.shape)
         np.save(save_path + "static_word_embeddings", static_word_embeddings)
+
 
 if __name__ == '__main__':
     DIR_PATH = os.path.dirname(os.path.realpath(__file__))
