@@ -22,8 +22,9 @@ import cytoolz
 
 import numpy
 from cymem.cymem cimport Pool
+from srsly import json_dumps, read_json
+
 import spacy
-from spacy.compat import json_dumps
 from spacy.typedefs cimport hash_t
 from spacy.structs cimport LexemeC, TokenC
 from spacy.lang.en import English
@@ -910,7 +911,7 @@ cdef class NeuralCoref(object):
 
     def from_disk(self, path, **exclude):
         deserializers = {
-            'cfg': lambda p: self.cfg.update(util.read_json(p)),
+            'cfg': lambda p: self.cfg.update(read_json(p)),
             'model': lambda p: None
         }
         util.from_disk(path, deserializers, exclude)

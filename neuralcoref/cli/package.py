@@ -1,12 +1,15 @@
 # coding: utf8
+# Copied from spaCy repo - all glory to Explosion AI
 from __future__ import unicode_literals
 
 import shutil
 from pathlib import Path
 import plac
 
+from srsly import json_dumps, read_json
+
 from spacy.cli._messages import Messages
-from spacy.compat import path2str, json_dumps
+from spacy.compat import path2str
 from spacy.util import prints
 from spacy import util
 from spacy import about
@@ -40,7 +43,7 @@ def package(input_dir, output_dir, meta_path=None, create_meta=False,
 
     meta_path = meta_path or input_path / 'meta.json'
     if meta_path.is_file():
-        meta = util.read_json(meta_path)
+        meta = read_json(meta_path)
         if not create_meta:  # only print this if user doesn't want to overwrite
             prints(meta_path, title=Messages.M041)
         else:

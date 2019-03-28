@@ -3,8 +3,9 @@ from __future__ import print_function
 import os
 import subprocess
 import sys
-import numpy
 import contextlib
+import textwrap
+import pkg_resources
 from distutils.command.build_ext import build_ext
 from distutils.sysconfig import get_python_inc
 from distutils import ccompiler, msvccompiler
@@ -19,6 +20,21 @@ PACKAGES = find_packages()
 
 MOD_NAMES = ['neuralcoref.neuralcoref']
 
+def is_installed(requirement):
+    try:
+        pkg_resources.require(requirement)
+    except pkg_resources.ResolutionError:
+        return False
+    else:
+        return True
+
+if not is_installed('numpy>=1.11.0') or not is_installed('spacy>=2.0.4'):
+    print(textwrap.dedent("""
+            Error: requirements needs to be installed first.
+            You can install them via:
+            $ pip install -r requirements.txt
+            """), file=sys.stderr)
+    exit(1)
 
 @contextlib.contextmanager
 def chdir(new_dir):
@@ -46,6 +62,7 @@ def is_source_release(path):
 
 
 def setup_package():
+    import numpy
     root = os.path.abspath(os.path.dirname(__file__))
     with chdir(root):
         if not is_source_release(root):
@@ -94,7 +111,7 @@ def setup_package():
                 'Programming Language :: Python :: 3.4',
                 'Programming Language :: Python :: 3.6'
             ],
-            install_requires=['numpy', 'spacy>=2.0.11'],
+            install_requires=['numpy', 'spacy>=2.1.0', 'cytoolz'],
             packages=PACKAGES,
             package_data=PACKAGE_DATA,
             keywords='NLP chatbots coreference resolution',

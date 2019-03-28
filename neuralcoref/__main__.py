@@ -6,10 +6,11 @@ from __future__ import print_function
 if __name__ == '__main__':
     import plac
     import sys
-    from neuralcoref.cli import package
+    from neuralcoref.cli import package, download
     from spacy.util import prints
 
     commands = {
+        'download': download,
         'package': package,
     }
     if len(sys.argv) == 1:
