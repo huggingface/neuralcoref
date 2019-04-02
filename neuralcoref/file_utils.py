@@ -31,6 +31,9 @@ try:
 except (AttributeError, ImportError):
     NEURALCOREF_CACHE = os.getenv('NEURALCOREF_CACHE', os.path.join(os.path.expanduser("~"), '.neuralcoref_cache'))
 
+NEURALCOREF_MODEL_URL = "https://s3.amazonaws.com/models.huggingface.co/neuralcoref/neuralcoref.tar.gz"
+NEURALCOREF_MODEL_PATH = os.path.join(str(NEURALCOREF_CACHE), "neuralcoref")
+
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 

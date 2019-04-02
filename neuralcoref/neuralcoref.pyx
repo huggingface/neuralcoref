@@ -18,7 +18,6 @@ cimport cython
 from cpython cimport array
 import array
 from libc.stdint cimport uint16_t, uint32_t, uint64_t, uintptr_t, int32_t
-import cytoolz
 
 import numpy
 from cymem.cymem cimport Pool
@@ -43,6 +42,8 @@ from spacy.compat import is_config
 from thinc.v2v import Model, ReLu, Affine
 from thinc.api import chain, clone
 # from thinc.neural.util import get_array_module
+
+from .file_utils import NEURALCOREF_MODEL_PATH
 
 ##############################
 ##### A BUNCH OF SIZES #######
@@ -542,6 +543,9 @@ cdef class NeuralCoref(object):
             Token.set_extension('coref_clusters', getter=self.token_clusters)
             Token.set_extension('coref_scores', getter=self.token_scores)
 
+        # Load from disk
+        self.from_disk(NEURALCOREF_MODEL_PATH)
+
     def __reduce__(self):
         return (NeuralCoref, (self.vocab, self.model), None, None)
 
@@ -595,7 +599,7 @@ cdef class NeuralCoref(object):
             conv_dict = self.cfg.get('conv_dict', None)
         if blacklist is None:
             blacklist = self.cfg.get('blacklist', True)
-        for docs in cytoolz.partition_all(batch_size, stream):
+        for docs in util.minibatch(stream, size=batch_size):
             docs = list(docs)
             annotations = self.predict(docs, greedyness=greedyness, max_dist=max_dist,
                                     max_dist_match=max_dist_match, blacklist=blacklist)
