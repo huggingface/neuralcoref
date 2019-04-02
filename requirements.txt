@@ -1,5 +1,2 @@
 spacy
-cython
-numpy
-boto3
-requests
+Cython

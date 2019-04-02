@@ -135,7 +135,6 @@ def is_source_release(path):
 
 
 def setup_package():
-    import numpy
     root = os.path.abspath(os.path.dirname(__file__))
     with chdir(root):
         if not is_source_release(root):
@@ -192,8 +191,12 @@ def setup_package():
                 "Programming Language :: Python :: 3.7",
                 "Topic :: Scientific/Engineering",
             ],
-            install_requires=['numpy>=1.15.0', 'spacy>=2.1.0'],
-            setup_requires=["wheel"],
+            install_requires=[
+                "numpy>=1.15.0",
+                "boto3",
+                "requests>=2.13.0,<3.0.0",
+                "spacy>=2.1.0"],
+            setup_requires=['wheel', 'spacy>=2.1.0'],
             python_requires=">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*",
             packages=PACKAGES,
             package_data=PACKAGE_DATA,
