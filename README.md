@@ -1,9 +1,11 @@
-# ✨NeuralCoref 4.0: English Coreference Resolution in spaCy with Neural Networks.
+# ✨NeuralCoref 4.0: Coreference Resolution in spaCy with Neural Networks.
 
 NeuralCoref is a pipeline extension for spaCy 2.1+ which annotates and resolves coreference clusters using a neural network. NeuralCoref is production-ready, integrated in spaCy's NLP pipeline and extensible to new training datasets.
 
 For a brief introduction to coreference resolution and NeuralCoref, please refer to our [blog post](https://medium.com/huggingface/state-of-the-art-neural-coreference-resolution-for-chatbots-3302365dcf30).
-NeuralCoref is written in Python/Cython and comes with a pre-trained statistical model for **English only**. NeuralCoref is accompanied by a visualization client [NeuralCoref-Viz](https://github.com/huggingface/neuralcoref-viz), a web interface  powered by a REST server that can be [tried online](https://huggingface.co/coref/). NeuralCoref is released under the MIT license.
+NeuralCoref is written in Python/Cython and comes with a pre-trained statistical model for **English only**.
+
+NeuralCoref is accompanied by a visualization client [NeuralCoref-Viz](https://github.com/huggingface/neuralcoref-viz), a web interface  powered by a REST server that can be [tried online](https://huggingface.co/coref/). NeuralCoref is released under the MIT license.
 
 ✨ Version 4.0 out now! Available on pip and compatible with SpaCy 2.1+.
 
@@ -116,7 +118,35 @@ doc._.coref_clusters
 
 NeuralCoref will resolve the coreferences and annotate them as [extension attributes](https://spacy.io/usage/processing-pipelines#custom-components-extensions) in the spaCy `Doc`,  `Span` and `Token` objects under the `._.` dictionary.
 
-Here are a few examples on how you can navigate the coreference cluster chains and display clusters and mentions before we list all the extensions added by NeuralCoref to a spaCy document.
+Here is the list of the annotations:
+
+|  Attribute                |  Type              |  Description
+|---------------------------|--------------------|-----------------------------------------------------
+|`doc._.has_coref`          |boolean             |Has any coreference has been resolved in the Doc
+|`doc._.coref_clusters`     |list of `Cluster`   |All the clusters of corefering mentions in the doc
+|`doc._.coref_resolved`     |unicode             |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
+|`doc._.coref_scores`       |Dict             |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
+|`span._.is_coref`          |boolean             |Whether the span has at least one corefering mention
+|`span._.coref_cluster`     |`Cluster`           |Cluster of mentions that corefer with the span
+|`token._.in_coref`         |boolean             |Whether the token is inside at least one corefering mention
+|`token._.coref_clusters`   |list of `Cluster`   |All the clusters of corefering mentions that contains the token
+
+A `Cluster` is a cluster of coreferring mentions which has 3 attributes and a few methods to simplify the navigation inside a cluster:
+
+|  Attribute or method   |  Type / Return type |  Description
+|------------------------|---------------------|-----------------------------------------------------
+|`i`                     |int                  |Index of the cluster in the Doc
+|`main`                  |`Span`               |Span of the most representative mention in the cluster
+|`mentions`              |list of `Span`       |List of all the mentions in the cluster
+|`__getitem__`           |return `Span`        |Access a mention in the cluster
+|`__iter__`              |yields `Span`        |Iterate over mentions in the cluster
+|`__len__`               |return int           |Number of mentions in the cluster
+
+### Naviguating the coreference cluster chains
+
+You can also easily navigate the coreference cluster chains and display clusters and mentions.
+
+Here are some examples, try them out to test it for yourself.
 
 ```python
 import spacy
@@ -144,41 +174,6 @@ span._.coref_cluster.main._.coref_cluster
 **Important**: NeuralCoref mentions are spaCy [Span objects](https://spacy.io/api/span) which means you can access all the usual [Span attributes](https://spacy.io/api/span#attributes) like `span.start` (index of the first token of the span in the document), `span.end` (index of the first token after the span in the document), etc...
 
 Ex: `doc._.coref_clusters[1].mentions[-1].start` will give you the index of the first token of the last mention of the second coreference cluster in the document.
-
-Here is the full list of the Doc, Span and Token Extension Attributes added by NeuralCoref:
-
-### Doc, Span and Token Extension Attributes
-
-|  Attribute                |  Type              |  Description
-|---------------------------|--------------------|-----------------------------------------------------
-|`doc._.has_coref`          |boolean             |Has any coreference has been resolved in the Doc
-|`doc._.coref_clusters`     |list of `Cluster`   |All the clusters of corefering mentions in the doc
-|`doc._.coref_resolved`     |unicode             |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
-|`doc._.coref_scores`       |unicode             |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
-|`span._.is_coref`          |boolean             |Whether the span has at least one corefering mention
-|`span._.coref_cluster`     |`Cluster`           |Cluster of mentions that corefer with the span
-|`token._.in_coref`         |boolean             |Whether the token is inside at least one corefering mention
-|`token._.coref_clusters`   |list of `Cluster`   |All the clusters of corefering mentions that contains the token
-
-### The Cluster class
-
-The Cluster class is a small container for a cluster of mentions.
-
-A `Cluster` contains 3 attributes:
-
-|  Attribute                |  Type              |  Description
-|---------------------------|--------------------|-----------------------------------------------------
-|`cluster.i`                |int                 |Index of the cluster in the Doc
-|`cluster.main`             |`Span`              |Span of the most representative mention in the cluster
-|`cluster.mentions`         |list of `Span`      |All the mentions in the cluster
-
-The `Cluster` class also implements a few Python class methods to simplify the navigation inside a cluster:
-
-|  Method              |  Output              |  Description
-|----------------------|----------------------|-----------------------------------------------------
-|`Cluster.__getitem__` |return `Span`         |Access a mention in the cluster
-|`Cluster.__iter__`    |yields `Span`         |Iterate over mentions in the cluster
-|`Cluster.__len__`     |return int            |Number of mentions in the cluster
 
 ## Parameters
 

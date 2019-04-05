@@ -25,10 +25,6 @@ try:
 except ImportError:
     from urlparse import urlparse
 
-# try:
-#     from pathlib import Path
-#     NEURALCOREF_CACHE = Path(os.getenv('NEURALCOREF_CACHE', Path.home() / '.neuralcoref_cache'))
-# except (AttributeError, ImportError):
 NEURALCOREF_CACHE = os.getenv('NEURALCOREF_CACHE', os.path.join(os.path.expanduser("~"), '.neuralcoref_cache'))
 
 NEURALCOREF_MODEL_URL = "https://s3.amazonaws.com/models.huggingface.co/neuralcoref/neuralcoref.tar.gz"
@@ -62,8 +58,6 @@ def filename_to_url(filename, cache_dir=None):
     """
     if cache_dir is None:
         cache_dir = NEURALCOREF_CACHE
-    # if sys.version_info[0] == 3 and isinstance(cache_dir, Path):
-    #     cache_dir = str(cache_dir)
 
     cache_path = os.path.join(cache_dir, filename)
     if not os.path.exists(cache_path):
@@ -90,10 +84,6 @@ def cached_path(url_or_filename, cache_dir=None):
     """
     if cache_dir is None:
         cache_dir = NEURALCOREF_CACHE
-    # if sys.version_info[0] == 3 and isinstance(url_or_filename, Path):
-    #     url_or_filename = str(url_or_filename)
-    # if sys.version_info[0] == 3 and isinstance(cache_dir, Path):
-    #     cache_dir = str(cache_dir)
 
     parsed = urlparse(url_or_filename)
 
@@ -179,8 +169,6 @@ def get_from_cache(url, cache_dir=None):
     """
     if cache_dir is None:
         cache_dir = NEURALCOREF_CACHE
-    # if sys.version_info[0] == 3 and isinstance(cache_dir, Path):
-    #     cache_dir = str(cache_dir)
 
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
