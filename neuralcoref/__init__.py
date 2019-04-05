@@ -28,7 +28,7 @@ else:
     with tarfile.open(downloaded_model, 'r:gz') as archive:
         archive.extractall(NEURALCOREF_CACHE)
 
-def add_to_pipe(nlp):
-    coref = NeuralCoref(nlp.vocab)
+def add_to_pipe(nlp, **kwargs):
+    coref = NeuralCoref(nlp.vocab, **kwargs)
     nlp.add_pipe(coref, name='neuralcoref')
     return nlp
