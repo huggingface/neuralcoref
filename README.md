@@ -125,7 +125,7 @@ Here is the list of the annotations:
 |`doc._.has_coref`          |boolean             |Has any coreference has been resolved in the Doc
 |`doc._.coref_clusters`     |list of `Cluster`   |All the clusters of corefering mentions in the doc
 |`doc._.coref_resolved`     |unicode             |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
-|`doc._.coref_scores`       |Dict             |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
+|`doc._.coref_scores`       |Dict                |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
 |`span._.is_coref`          |boolean             |Whether the span has at least one corefering mention
 |`span._.coref_cluster`     |`Cluster`           |Cluster of mentions that corefer with the span
 |`token._.in_coref`         |boolean             |Whether the token is inside at least one corefering mention
@@ -188,7 +188,7 @@ Here is the full list of these parameters and their descriptions:
 |`max_dist_match` |int                      |The system will consider linking the current mention to a preceding one further than `max_dist` away if they share a noun or proper noun. In this case, it looks `max_dist_match` away instead. The default value is 500.
 |`blacklist`      |boolean                  |Should the system resolve coreferences for pronouns in the following list: `["i", "me", "my", "you", "your"]`. The default value is True (coreference resolved).
 |`store_scores`   |boolean                  |Should the system store the scores for the coreferences in annotations. The default value is True.
-|`conv_dict`      |dict(str, list(str))     |A conversion dictionary that you can use to replace some *rare words* embeddings with an average of *common words* embeddings. Ex: `conv_dict={"Angela": ["woman", "girl"]}` will help resolving coreferences for `Angela` by using the embeddings for the more common `woman` and `girl` instead of the embedding of `Angela`.
+|`conv_dict`      |dict(str, list(str))     |A conversion dictionary that you can use to replace the embeddings of *rare words* (keys) by an average of the embeddings of a list of *common words* (values). Ex: `conv_dict={"Angela": ["woman", "girl"]}` will help resolving coreferences for `Angela` by using the embeddings for the more common `woman` and `girl` instead of the embedding of `Angela`.
 
 ### How to change a parameter
 
