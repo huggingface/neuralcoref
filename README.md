@@ -26,7 +26,20 @@ This is the easiest way to install NeuralCoref.
 
 ```bash
 pip install neuralcoref
-````
+```
+
+#### `spacy.strings.StringStore size changed` error
+
+If you have an error mentioning `spacy.strings.StringStore size changed, may indicate binary incompatibility` when loading NeuralCoref with `import neuralcoref`, it means you'll have to install NeuralCoref from the distribution's sources instead of the wheels to get NeuralCoref to build against your version of SpaCy.
+
+In this case, simply re-install neuralcoref as follows:
+
+```bash
+pip uninstall neuralcoref
+pip install neuralcoref --no-binary neuralcoref
+```
+
+#### Installing SpaCy
 
 To be able to use NeuralCoref you will also need to have
 - SpaCy
@@ -43,9 +56,9 @@ spacy download en
 
 ### Install NeuralCoref from source
 
-You can also install NeuralCoref from the source. You will need to install the dependencies first which includes Cython and SpaCy.
+You can also install NeuralCoref from sources. You will need to install the dependencies first which includes Cython and SpaCy.
 
-You can install from source as follows:
+Here is the process:
 
 ```bash
 venv .env
