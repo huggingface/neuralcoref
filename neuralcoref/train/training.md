@@ -9,7 +9,7 @@ You will need to install [pyTorch](http://pytorch.org/), the neuralcoref package
 Currently this can be done (assuming an English language model) with
 ````bash
 conda install pytorch -c pytorch
-pip install -r ./training_requirements.txt -e .
+pip install -r ./train/training_requirements.txt -e .
 python -m spacy download en
 ````
 

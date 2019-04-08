@@ -18,10 +18,11 @@ cimport cython
 from cpython cimport array
 import array
 from libc.stdint cimport uint16_t, uint32_t, uint64_t, uintptr_t, int32_t
-import cytoolz
 
 import numpy
 from cymem.cymem cimport Pool
+from srsly import json_dumps, read_json
+
 import spacy
 from spacy.typedefs cimport hash_t
 from srsly import json_dumps, read_json
@@ -42,6 +43,15 @@ from spacy.compat import is_config
 from thinc.v2v import Model, ReLu, Affine
 from thinc.api import chain, clone
 # from thinc.neural.util import get_array_module
+
+from .file_utils import NEURALCOREF_MODEL_PATH
+
+##############################
+## DEFAULT INFERENCE VALUES ##
+
+GREEDYNESS = 0.5
+MAX_DIST = 50
+MAX_DIST_MATCH = 500
 
 ##############################
 ##### A BUNCH OF SIZES #######
@@ -496,34 +506,36 @@ cdef class NeuralCoref(object):
         }
         return (single_model, pairs_model), cfg
 
-    def __init__(self, Vocab vocab, model=True, **cfg):
+    def __init__(self, Vocab vocab, model=True, **cfg_inference):
         """Create a Coref pipeline component.
         vocab (Vocab): The vocabulary object. Must be shared with documents
             to be processed. The value is set to the `.vocab` attribute.
         model (object): Neural net model. The value is set to the .model attribute. If set to True
             (default), a new instance will be created with `NeuralCoref.Model()`
             in NeuralCoref.from_disk() or NeuralCoref.from_bytes().
-        **cfg: Arbitrary configuration parameters. Set to the `.cfg` attribute
+        **cfg_inference: Arbitrary configuration parameters. Set to the `.cfg_inference` attribute
         """
         self.vocab = vocab
         self.model = model
-        if 'greedyness' not in cfg:
-            cfg['greedyness'] = util.env_opt('greedyness', 0.5)
-        if 'max_dist' not in cfg:
-            cfg['max_dist'] = util.env_opt('max_dist', 50)
-        if 'max_dist_match' not in cfg:
-            cfg['max_dist_match'] = util.env_opt('max_dist_match', 500)
-        if 'blacklist' not in cfg:
-            cfg['blacklist'] = util.env_opt('blacklist', True)
-        if 'store_scores' not in cfg:
-            cfg['store_scores'] = util.env_opt('store_scores', True)
-        if 'conv_dict' not in cfg:
-            cfg['conv_dict'] = util.env_opt('conv_dict', None)
-        self.cfg = cfg
         self.hashes = get_hash_lookups(vocab.strings, vocab.mem)
         self.static_vectors = Vectors()
         self.tuned_vectors = Vectors()
         self.conv_dict = None
+        self.cfg = {}
+
+        if 'greedyness' not in cfg_inference:
+            cfg_inference['greedyness'] = util.env_opt('greedyness', GREEDYNESS)
+        if 'max_dist' not in cfg_inference:
+            cfg_inference['max_dist'] = util.env_opt('max_dist', MAX_DIST)
+        if 'max_dist_match' not in cfg_inference:
+            cfg_inference['max_dist_match'] = util.env_opt('max_dist_match', MAX_DIST_MATCH)
+        if 'blacklist' not in cfg_inference:
+            cfg_inference['blacklist'] = util.env_opt('blacklist', True)
+        if 'store_scores' not in cfg_inference:
+            cfg_inference['store_scores'] = util.env_opt('store_scores', True)
+        if 'conv_dict' not in cfg_inference:
+            cfg_inference['conv_dict'] = util.env_opt('conv_dict', None)
+        self.cfg_inference = cfg_inference
 
         # Register attributes on Doc and Span
         if not Doc.has_extension('huggingface_neuralcoref'):
@@ -541,14 +553,27 @@ cdef class NeuralCoref(object):
             Token.set_extension('coref_clusters', getter=self.token_clusters)
             Token.set_extension('coref_scores', getter=self.token_scores)
 
+        # Load from disk
+        self.from_disk(NEURALCOREF_MODEL_PATH)
+
     def __reduce__(self):
         return (NeuralCoref, (self.vocab, self.model), None, None)
 
-    def set_conv_dict(self, conv_dict):
-        self.conv_dict = Vectors()
+    def set_conv_dict(self, conv_dict=None):
+        def simple_normalize(word):
+            """ Get the hash of the lower case string of a word"""
+            return self.vocab.strings.add(word.lower())
+
+        if conv_dict is None:
+            conv_dict = self.cfg_inference.get('conv_dict', None)
+        if conv_dict is None:
+            return
+
+        self.cfg_inference['conv_dict'] = conv_dict
+        self.conv_dict = Vectors(shape=(len(conv_dict), self.tuned_vectors.shape[1]))
         for key, words in conv_dict.items():
-            norm_k = self.normalize(key)
-            norm_w = list(self.normalize(w) for w in words)
+            norm_k = simple_normalize(key)
+            norm_w = list(simple_normalize(w) for w in words)
             embed_vector = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
             for hash_w in norm_w:
                 embed_vector += self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
@@ -558,17 +583,16 @@ cdef class NeuralCoref(object):
              conv_dict=None, blacklist=None):
         """Apply the pipeline component on a Doc object. """
         if greedyness is None:
-            greedyness = self.cfg.get('greedyness', 0.5)
+            greedyness = self.cfg_inference.get('greedyness', GREEDYNESS)
         if max_dist is None:
-            max_dist = self.cfg.get('max_dist', 50)
+            max_dist = self.cfg_inference.get('max_dist', MAX_DIST)
         if max_dist_match is None:
-            max_dist_match = self.cfg.get('max_dist_match', 500)
-        if conv_dict is None:
-            conv_dict = self.cfg.get('conv_dict', None)
+            max_dist_match = self.cfg_inference.get('max_dist_match', MAX_DIST_MATCH)
         if blacklist is None:
-            blacklist = self.cfg.get('blacklist', True)
-        if conv_dict is not None:
-            self.set_conv_dict(conv_dict)
+            blacklist = self.cfg_inference.get('blacklist', True)
+
+        self.set_conv_dict(conv_dict)
+
         annotations = self.predict([doc], greedyness=greedyness, max_dist=max_dist,
                                   max_dist_match=max_dist_match, blacklist=blacklist)
         self.set_annotations([doc], annotations)
@@ -585,23 +609,24 @@ cdef class NeuralCoref(object):
         YIELDS (Doc): Documents, in order.
         """
         if greedyness is None:
-            greedyness = self.cfg.get('greedyness', 0.5)
+            greedyness = self.cfg_inference.get('greedyness', GREEDYNESS)
         if max_dist is None:
-            max_dist = self.cfg.get('max_dist', 50)
+            max_dist = self.cfg_inference.get('max_dist', MAX_DIST)
         if max_dist_match is None:
-            max_dist_match = self.cfg.get('max_dist_match', 500)
-        if conv_dict is None:
-            conv_dict = self.cfg.get('conv_dict', None)
+            max_dist_match = self.cfg_inference.get('max_dist_match', MAX_DIST_MATCH)
         if blacklist is None:
-            blacklist = self.cfg.get('blacklist', True)
-        for docs in cytoolz.partition_all(batch_size, stream):
+            blacklist = self.cfg_inference.get('blacklist', True)
+
+        self.set_conv_dict(conv_dict)
+
+        for docs in util.minibatch(stream, size=batch_size):
             docs = list(docs)
             annotations = self.predict(docs, greedyness=greedyness, max_dist=max_dist,
                                     max_dist_match=max_dist_match, blacklist=blacklist)
             self.set_annotations(docs, annotations)
             yield from docs
 
-    def predict(self, docs, float greedyness=0.5, int max_dist=50, int max_dist_match=500,
+    def predict(self, docs, float greedyness=0.5, int max_dist=MAX_DIST, int max_dist_match=MAX_DIST_MATCH,
                 conv_dict=None, bint blacklist=False):
         ''' Predict coreference clusters
         docs (iterable): A sequence of `Doc` objects.
@@ -778,7 +803,7 @@ cdef class NeuralCoref(object):
 
             # Build scores dict
             scores_dict = {}
-            if self.cfg['store_scores']:
+            if self.cfg_inference['store_scores']:
                 # mention scores
                 for i in range(n_mentions):
                     mention = mentions[i]

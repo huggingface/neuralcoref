@@ -57,6 +57,7 @@ cdef class NeuralCoref(object):
     cdef HashesList hashes
     cdef readonly Vocab vocab
     cdef readonly object cfg
+    cdef readonly object cfg_inference
     cdef public object model
     cdef public object static_vectors
     cdef public object tuned_vectors
