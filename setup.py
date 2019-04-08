@@ -201,7 +201,7 @@ def setup_package():
                     extra_link_args=extra_link_args))
 
         setup(name='neuralcoref',
-            version='3.9',
+            version='4.0',
             description="Coreference Resolution in spaCy with Neural Networks",
             url='https://github.com/huggingface/neuralcoref',
             author='Thomas Wolf',

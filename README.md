@@ -189,7 +189,7 @@ Here is the full list of these parameters and their descriptions:
 |`max_dist_match` |int                      |The system will consider linking the current mention to a preceding one further than `max_dist` away if they share a noun or proper noun. In this case, it looks `max_dist_match` away instead. The default value is 500.
 |`blacklist`      |boolean                  |Should the system resolve coreferences for pronouns in the following list: `["i", "me", "my", "you", "your"]`. The default value is True (coreference resolved).
 |`store_scores`   |boolean                  |Should the system store the scores for the coreferences in annotations. The default value is True.
-|`conv_dict`      |dict(str, list(str))     |A conversion dictionary that you can use to replace the embeddings of *rare words* (keys) by an average of the embeddings of a list of *common words* (values). Ex: `conv_dict={"Angela": ["woman", "girl"]}` will help resolving coreferences for `Angela` by using the embeddings for the more common `woman` and `girl` instead of the embedding of `Angela`.
+|`conv_dict`      |dict(str, list(str))     |A conversion dictionary that you can use to replace the embeddings of *rare words* (keys) by an average of the embeddings of a list of *common words* (values). Ex: `conv_dict={"Angela": ["woman", "girl"]}` will help resolving coreferences for `Angela` by using the embeddings for the more common `woman` and `girl` instead of the embedding of `Angela`. This currently only works for single words (not for words groups).
 
 ### How to change a parameter
 
@@ -236,7 +236,7 @@ nlp.remove_pipe("neuralcoref")
 coref = neuralcoref.NeuralCoref(nlp.vocab, conv_dict={'Deepika': ['woman', 'actress']})
 nlp.add_pipe(coref, name='neuralcoref')
 # or after NeuralCoref is already in SpaCy's pipe, by modifying NeuralCoref in the pipeline
-nlp.pipeline[-1][-1].set_conv_dict({'Deepika': ['woman', 'actress']})
+nlp.get_pipe('neuralcoref').set_conv_dict({'Deepika': ['woman', 'actress']})
 
 # Let's try agin with the conversion dictionary:
 doc = nlp(u'Deepika has a dog. She loves him. The movie star has always been fond of animals')
