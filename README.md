@@ -125,9 +125,10 @@ Here is the list of the annotations:
 |`doc._.has_coref`          |boolean             |Has any coreference has been resolved in the Doc
 |`doc._.coref_clusters`     |list of `Cluster`   |All the clusters of corefering mentions in the doc
 |`doc._.coref_resolved`     |unicode             |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
-|`doc._.coref_scores`       |Dict                |Unicode representation of the doc where each corefering mention is replaced by the main mention in the associated cluster.
+|`doc._.coref_scores`       |Dict of Dict        |Scores of the coreference resolution between mentions.
 |`span._.is_coref`          |boolean             |Whether the span has at least one corefering mention
 |`span._.coref_cluster`     |`Cluster`           |Cluster of mentions that corefer with the span
+|`span._.coref_scores`      |Dict                |Scores of the coreference resolution of & span with other mentions (if applicable).
 |`token._.in_coref`         |boolean             |Whether the token is inside at least one corefering mention
 |`token._.coref_clusters`   |list of `Cluster`   |All the clusters of corefering mentions that contains the token
 
@@ -208,7 +209,7 @@ coref = neuralcoref.NeuralCoref(nlp.vocab, greedyness=0.75)
 nlp.add_pipe(coref, name='neuralcoref')
 ```
 
-### Using the conversion dictionary to help resolve rare words
+### Using the conversion dictionary parameter to help resolve rare words
 
 Here is an example on how we can use the parameter `conv_dict` to help resolving coreferences of a rare word like a name:
 
@@ -220,28 +221,28 @@ nlp = spacy.load('en')
 
 # Let's try before using the conversion dictionary:
 neuralcoref.add_to_pipe(nlp)
-doc = nlp(u'Angela has a dog. She loves him')
+doc = nlp(u'Deepika has a dog. She loves him. The movie star has always been fond of animals')
 doc._.coref_clusters
 doc._.coref_resolved
-# >>> [Angela: [Angela, She, him]]
-# >>> 'Angela has a dog. Angela loves Angela'
+# >>> [Deepika: [Deepika, She, him, The movie star]]
+# >>> 'Deepika has a dog. Deepika loves Deepika. Deepika has always been fond of animals'
 # >>> Not very good...
 
 # Here are three ways we can add the conversion dictionary
 nlp.remove_pipe("neuralcoref")
-neuralcoref.add_to_pipe(nlp, conv_dict={'Angela': ['woman', 'girl']})
+neuralcoref.add_to_pipe(nlp, conv_dict={'Deepika': ['woman', 'actress']})
 # or
 nlp.remove_pipe("neuralcoref")
-coref = neuralcoref.NeuralCoref(nlp.vocab, conv_dict={'Angela': ['woman', 'girl']})
+coref = neuralcoref.NeuralCoref(nlp.vocab, conv_dict={'Deepika': ['woman', 'actress']})
 nlp.add_pipe(coref, name='neuralcoref')
 # or after NeuralCoref is already in SpaCy's pipe, by modifying NeuralCoref in the pipeline
-nlp.pipeline[-1][-1].set_conv_dict({'Angela': ['woman', 'girl']})
+nlp.pipeline[-1][-1].set_conv_dict({'Deepika': ['woman', 'actress']})
 
 # Let's try agin with the conversion dictionary:
-doc = nlp(u'Angela has a dog. She loves him')
+doc = nlp(u'Deepika has a dog. She loves him. The movie star has always been fond of animals')
 doc._.coref_clusters
-# >>> [Angela: [Angela, She], a dog: [a dog, him]]
-# >>> 'Angela has a dog. Angela loves a dog'
+# >>> [Deepika: [Deepika, She, The movie star], a dog: [a dog, him]]
+# >>> 'Deepika has a dog. Deepika loves a dog. Deepika has always been fond of animals'
 # >>> A lot better!
 ```
 
