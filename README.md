@@ -30,7 +30,7 @@ pip install neuralcoref
 
 #### `spacy.strings.StringStore size changed` error
 
-If you have an error mentioning `spacy.strings.StringStore size changed, may indicate binary incompatibility` when loading NeuralCoref with `import neuralcoref`, it means you'll have to install NeuralCoref from the distribution's sources instead of the wheels to get NeuralCoref to build against your version of SpaCy.
+If you have an error mentioning `spacy.strings.StringStore size changed, may indicate binary incompatibility` when loading NeuralCoref with `import neuralcoref`, it means you'll have to install NeuralCoref from the distribution's sources instead of the wheels to get NeuralCoref to build against the most recent version of SpaCy for your system.
 
 In this case, simply re-install neuralcoref as follows:
 
@@ -39,19 +39,17 @@ pip uninstall neuralcoref
 pip install neuralcoref --no-binary neuralcoref
 ```
 
-#### Installing SpaCy
+#### Installing SpaCy's model
 
-To be able to use NeuralCoref you will also need to have
-- SpaCy
-- an English model for SpaCy.
+To be able to use NeuralCoref you will also need to have an English model for SpaCy.
 
 You can use whatever english model works fine for your application but note that the performances of NeuralCoref are strongly dependent on the performances of the SpaCy model and in particular on the performances of SpaCy model's tagger, parser and NER components. A larger SpaCy English model will thus improve the quality of the coreference resolution as well (see some details in the [Internals and Model](#-Internals-and-Model) section below).
 
-Here is an example of how spacy and a (small) English model can be downloaded:
+Here is an example of how you can install SpaCy and a (small) English model for SpaCy, more information can be found on [spacy's website](https://spacy.io/usage/models):
 
 ```bash
-pip install spacy
-spacy download en
+pip install -U spacy
+python -m spacy download en
 ```
 
 ### Install NeuralCoref from source
