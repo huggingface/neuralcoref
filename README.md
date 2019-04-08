@@ -82,6 +82,21 @@ The cache folder is set by defaults to `~/.neuralcoref_cache` (see [file_utils.p
 
 The cache folder can be safely deleted at any time and the module will download again the model the next time it is loaded.
 
+You can have more information on the location, downloading and caching process of the internal model by activating python's `logging` module before loading NeuralCoref as follows:
+
+```python
+import logging;
+logging.basicConfig(level=logging.INFO)
+import neuralcoref
+>>> INFO:neuralcoref:Getting model from https://s3.amazonaws.com/models.huggingface.co/neuralcoref/neuralcoref.tar.gz or cache
+>>> INFO:neuralcoref.file_utils:https://s3.amazonaws.com/models.huggingface.co/neuralcoref/neuralcoref.tar.gz not found in cache, downloading to /var/folders/yx/cw8n_njx3js5jksyw_qlp8p00000gn/T/tmp_8y5_52m
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 40155833/40155833 [00:06<00:00, 6679263.76B/s]
+>>> INFO:neuralcoref.file_utils:copying /var/folders/yx/cw8n_njx3js5jksyw_qlp8p00000gn/T/tmp_8y5_52m to cache at /Users/thomaswolf/.neuralcoref_cache/f46bc05a4bfba2ae0d11ffd41c4777683fa78ed357dc04a23c67137abf675e14.7d6f9a6fecf5cf09e74b65f85c7d6896b21decadb2554d486474f63b95ec4633
+>>> INFO:neuralcoref.file_utils:creating metadata file for /Users/thomaswolf/.neuralcoref_cache/f46bc05a4bfba2ae0d11ffd41c4777683fa78ed357dc04a23c67137abf675e14.7d6f9a6fecf5cf09e74b65f85c7d6896b21decadb2554d486474f63b95ec4633
+>>> INFO:neuralcoref.file_utils:removing temp file /var/folders/yx/cw8n_njx3js5jksyw_qlp8p00000gn/T/tmp_8y5_52m
+>>> INFO:neuralcoref:extracting archive file /Users/thomaswolf/.neuralcoref_cache/f46bc05a4bfba2ae0d11ffd41c4777683fa78ed357dc04a23c67137abf675e14.7d6f9a6fecf5cf09e74b65f85c7d6896b21decadb2554d486474f63b95ec4633 to dir /Users/thomaswolf/.neuralcoref_cache/neuralcoref
+```
+
 ## Loading NeuralCoref
 
 ### Adding NeuralCoref to the pipe of an English SpaCy Language
