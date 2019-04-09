@@ -20,7 +20,12 @@ import array
 from libc.stdint cimport uint16_t, uint32_t, uint64_t, uintptr_t, int32_t
 
 import numpy
-import cupy
+try:
+    import cupy
+    to_numpy = cupy.asnumpy
+except ModuleNotFoundError:
+    to_numpy = lambda x: x
+
 from thinc.neural.util import get_array_module
 from cymem.cymem cimport Pool
 from srsly import json_dumps, read_json
@@ -764,11 +769,11 @@ cdef class NeuralCoref(object):
             best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
             best_score = best_score_ar
             best_ant = best_ant_ar
-            s_score = cupy.asnumpy(self.model[0](xp.asarray(s_inp_arr)))
+            s_score = to_numpy(self.model[0](xp.asarray(s_inp_arr)))
             for i in range(n_mentions):
                 best_score[i] = s_score[i, 0] - 50 * (greedyness - 0.5)
                 best_ant[i] = i
-            p_score = cupy.asnumpy(self.model[1](xp.asarray(p_inp_arr)))
+            p_score = to_numpy(self.model[1](xp.asarray(p_inp_arr)))
             for i in range(n_pairs):
                 ant_idx = p_ant[i]
                 men_idx = p_men[i]
