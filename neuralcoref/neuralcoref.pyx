@@ -20,6 +20,8 @@ import array
 from libc.stdint cimport uint16_t, uint32_t, uint64_t, uintptr_t, int32_t
 
 import numpy
+import cupy
+from thinc.neural.util import get_array_module
 from cymem.cymem cimport Pool
 from srsly import json_dumps, read_json
 
@@ -574,9 +576,10 @@ cdef class NeuralCoref(object):
         for key, words in conv_dict.items():
             norm_k = simple_normalize(key)
             norm_w = list(simple_normalize(w) for w in words)
-            embed_vector = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
-            for hash_w in norm_w:
-                embed_vector += self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
+            embed_vector = sum(
+                self.tuned_vectors[hash_w] if hash_w in self.tuned_vectors else self.get_static(hash_w)
+                for hash_w in norm_w
+            )
             self.conv_dict.add(key=norm_k, vector=embed_vector/max(len(norm_w), 1))
 
     def __call__(self, doc, greedyness=None, max_dist=None, max_dist_match=None,
@@ -639,7 +642,7 @@ cdef class NeuralCoref(object):
             Doc doc
             uint64_t i, ant_idx, men_idx, b_idx, n_mentions, n_pairs
             uint64_t [::1] p_ant, p_men, best_ant
-            float [::1] embed, feats, doc_embed, mention_embed, best_score
+            float [::1] embed, feats, mention_embed, best_score
             float [:, ::1] s_inp, p_inp
             float [:, ::1] s_score, p_score
             Pool mem
@@ -648,6 +651,8 @@ cdef class NeuralCoref(object):
         #    double timing0, timing1, timing2, timing3, timing4
         #    clock_gettime(CLOCK_REALTIME, &ts)
         #    timing0 = ts.tv_sec + (ts.tv_nsec / 1000000000.)
+
+        xp = get_array_module(self.static_vectors.data)
 
         annotations = []
         # if debug: print("Extract mentions")
@@ -717,8 +722,7 @@ cdef class NeuralCoref(object):
             # if debug: print("Build single features and pair features arrays")
             # ''' Build single features and pair features arrays '''
             doc_c = doc.c
-            doc_embedding = numpy.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
-            doc_embed = doc_embedding
+            doc_embedding = xp.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
             for i in range(n_mentions):
                 s_inp_arr[i, :SGNL_FEATS_0] = self.get_mention_embeddings(mentions[i], doc_embedding) # Set embeddings
                 s_inp_arr[i, SGNL_FEATS_0 + c[i].mention_type] = 1                      # 01_MentionType
@@ -760,11 +764,11 @@ cdef class NeuralCoref(object):
             best_ant_ar = numpy.empty((n_mentions), dtype=numpy.uint64)
             best_score = best_score_ar
             best_ant = best_ant_ar
-            s_score = self.model[0](s_inp_arr)
+            s_score = cupy.asnumpy(self.model[0](xp.asarray(s_inp_arr)))
             for i in range(n_mentions):
                 best_score[i] = s_score[i, 0] - 50 * (greedyness - 0.5)
                 best_ant[i] = i
-            p_score = self.model[1](p_inp_arr)
+            p_score = cupy.asnumpy(self.model[1](xp.asarray(p_inp_arr)))
             for i in range(n_pairs):
                 ant_idx = p_ant[i]
                 men_idx = p_men[i]
@@ -814,8 +818,8 @@ cdef class NeuralCoref(object):
                         scores_dict[mention] = {mention: score}
                 # pair scores
                 for i in range(n_pairs):
-                    antecedent = mentions[p_ant[i]]
-                    mention = mentions[p_men[i]]
+                    antecedent = mentions[int(p_ant[i])]
+                    mention = mentions[int(p_men[i])]
                     score = p_score[i, 0]
                     if mention in scores_dict:
                         scores_dict[mention][antecedent] = score
@@ -899,8 +903,10 @@ cdef class NeuralCoref(object):
         ''' Create a mention embedding with span (averaged) and word (single) embeddings '''
         doc = span.doc
         sent = span.sent
-        embeddings = numpy.zeros((EMBED_13, ), dtype='float32')
-        embeddings[        :EMBED_01] = self.get_average_embedding(span)
+        span_embeddings = self.get_average_embedding(span)
+        xp = get_array_module(span_embeddings)
+        embeddings = xp.zeros((EMBED_13, ), dtype='float32')
+        embeddings[        :EMBED_01] = span_embeddings
         embeddings[EMBED_01:EMBED_02] = self.get_average_embedding(doc[max(span.start-5, sent.start):span.start])
         embeddings[EMBED_02:EMBED_03] = self.get_average_embedding(doc[span.end:min(span.end + 5, sent.end)])
         embeddings[EMBED_03:EMBED_04] = self.get_average_embedding(sent)
