@@ -892,16 +892,8 @@ cdef class NeuralCoref(object):
         return self.get_word_embedding(sent.doc[i])
 
     def get_average_embedding(self, Span span):
-        cdef int i
-        cdef int n = 0
-        embed_arr = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
-        for token in span:
-            if token.lower not in PUNCTS:
-                n += 1
-                embed_vector = self.get_word_embedding(token, tuned=False)
-                embed_arr = embed_arr + embed_vector
-        embed_arr = numpy.divide(embed_arr, float(max(n, 1)))
-        return embed_arr
+        tokens = [token for token in span if token.lower not in PUNCTS]
+        return sum(self.get_word_embedding(token, tuned=False) for token in tokens) / float(max(len(tokens), 1))
 
     def get_mention_embeddings(self, Span span, doc_embedding):
         ''' Create a mention embedding with span (averaged) and word (single) embeddings '''
