@@ -26,7 +26,7 @@ class AllResource(object):
     def on_get(self, req, resp):
         self.response = {}
 
-        text_param = req.get_param("text")
+        text_param = req.get_param_as_list("text")
         if text_param is not None:
             text = ",".join(text_param) if isinstance(text_param, list) else text_param
             text = unicode_(text)
