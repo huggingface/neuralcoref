@@ -10,6 +10,7 @@ import json
 from wsgiref.simple_server import make_server
 import falcon
 import spacy
+import neuralcoref
 
 try:
     unicode_ = unicode  # Python 2
@@ -19,7 +20,8 @@ except NameError:
 
 class AllResource(object):
     def __init__(self):
-        self.nlp = spacy.load('en_coref_sm')
+        self.nlp = spacy.load('en')
+        neuralcoref.add_to_pipe(self.nlp)
         print("Server loaded")
         self.response = None
 
@@ -27,6 +29,7 @@ class AllResource(object):
         self.response = {}
 
         text_param = req.get_param_as_list("text")
+        print("text: ", text_param)
         if text_param is not None:
             text = ",".join(text_param) if isinstance(text_param, list) else text_param
             text = unicode_(text)
