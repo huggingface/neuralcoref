@@ -276,6 +276,25 @@ doc._.coref_clusters
 
 A simple example of server script for integrating NeuralCoref in a REST API is provided as an example in [`examples/server.py`](examples/server.py).
 
+To use it you need to install falcon first:
+
+```bash
+pip install falcon
+```
+
+You can then start the server as follows:
+
+```bash
+cd examples
+python ./server.py
+```
+
+And query the server like this:
+
+```bash
+curl --data-urlencode "text=My sister has a dog. She loves him." -G localhost:8000
+```
+
 There are many other ways you can manage and deploy NeuralCoref. Some examples can be found in [spaCy Universe](https://spacy.io/universe/).
 
 ## Re-train the model / Extend to another language
