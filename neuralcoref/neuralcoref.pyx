@@ -729,7 +729,7 @@ cdef class NeuralCoref(object):
             doc_c = doc.c
             doc_embedding = xp.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
             for i in range(n_mentions):
-                s_inp_arr[i, :SGNL_FEATS_0] = self.get_mention_embeddings(mentions[i], doc_embedding) # Set embeddings
+                s_inp_arr[i, :SGNL_FEATS_0] = to_numpy(self.get_mention_embeddings(mentions[i], doc_embedding)) # Set embeddings
                 s_inp_arr[i, SGNL_FEATS_0 + c[i].mention_type] = 1                      # 01_MentionType
                 b_idx, val = index_distance(c[i].span_end - c[i].span_start - 1)    # 02_MentionLength
                 s_inp_arr[i, SGNL_FEATS_1 + b_idx] = 1
