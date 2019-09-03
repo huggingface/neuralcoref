@@ -315,7 +315,7 @@ class ConllDoc(Document):
                 self.mentions.append(mention)
                 #            print("mention: ", mention, "label", mention.gold_label)
         else:
-            self._extract_mentions(parsed, len(self.utterances), self.n_sents, self.speakers[speaker_id])
+            self._process_mentions(parsed, len(self.utterances), self.n_sents, self.speakers[speaker_id])
             # Assign a gold label to mentions which have one
             if debug: print("Check corefs", corefs)
             for i, coref in enumerate(corefs):
@@ -594,13 +594,20 @@ class ConllCorpus(object):
                                       embedding_extractor=self.embed_extractor,
                                       conll=CONLL_GENRES[name[:2]]))
         print("🌋 Loading spacy model")
-        try:
-            spacy.info('en_core_web_sm')
-            model = 'en_core_web_sm'
-        except IOError:
-            print("No spacy 2 model detected, using spacy1 'en' model")
-            spacy.info('en')
-            model = 'en'
+        model_options = ['en_core_web_sm', 'en', 'en_core_web_md', 'en_core_web_lg']
+        model = None
+        for model_option in model_options:
+            if not model:
+                try:
+                    spacy.info(model_option)
+                    model = model_option
+                    print("Loaded model", model_option)
+                except:
+                    print("Could not detect model", model_option)
+        if not model:
+            print("Could not detect any suitable English model")
+            return
+
         nlp = spacy.load(model)
         print("🌋 Parsing utterances and filling docs")
         doc_iter = (s for s in self.utts_text)

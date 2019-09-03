@@ -7,6 +7,7 @@ from __future__ import print_function
 import re
 import io
 from six import string_types, integer_types
+from spacy.tokens import Span, Token
 
 from neuralcoref.train.compat import unicode_
 from neuralcoref.train.utils import encode_distance, parallel_process
@@ -599,10 +600,18 @@ class Document(object):
     ## FEATURES MENTIONS EXTRACTION ###
     ###################################
 
-    def _process_mentions(self, mentions_spans, utterance_index, n_sents, speaker):
+    def _process_mentions(self, mentions, utterance_index, n_sents, speaker):
         '''
         Process mentions in a spacy doc (an utterance)
         '''
+        mentions_spans = []
+        for mention in mentions:
+            if isinstance(mention, Span):
+                mentions_spans.append(mention)
+            elif isinstance(mention, Token):
+                mentions_spans.append(Span(mention.doc, mention.i, mention.i))
+            else:
+                raise ValueError("Found weird mention", type(mention))
         processed_spans = sorted((m for m in mentions_spans), key=lambda m: (m.root.i, m.start))
         n_mentions = len(self.mentions)
         for mention_index, span in enumerate(processed_spans):
