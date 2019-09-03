@@ -2,7 +2,7 @@
 /neuralcoref/train/runs/*
 /models/
 /data/
-/.idea/*
+.idea/*
 
 # Cython / C extensions
 cythonize.json
