@@ -46,12 +46,12 @@ Conllparser will:
 ## Train the model
 Once the files have been pre-processed (you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (train|test|dev) data folder), you can start the training process using [learn.py](/neuralcoref/train/learn.py), for example as
 ````bash
-python -m neuralcoref.learn --train ./data/train/ --eval ./data/dev/
+python -m neuralcoref.train.learn --train ./data/train/ --eval ./data/dev/
 ````
 
 There many parameters and options for the training. You can list them with the usual
 ````bash
-python -m neuralcoref.learn --help
+python -m neuralcoref.train.learn --help
 ````
 
 You can follow the training by running [Tensorboard for pyTorch](https://github.com/lanpa/tensorboard-pytorch) (it requires a version of Tensorflow, any version will be fine). Run it with `tensorboard --logdir runs`.
