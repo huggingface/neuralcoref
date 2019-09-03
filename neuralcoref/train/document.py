@@ -8,8 +8,8 @@ import re
 import io
 from six import string_types, integer_types
 
-from neuralcoref.compat import unicode_
-from neuralcoref.utils import encode_distance, parallel_process
+from neuralcoref.train.compat import unicode_
+from neuralcoref.train.utils import encode_distance, parallel_process
 
 try:
     from itertools import izip_longest as zip_longest

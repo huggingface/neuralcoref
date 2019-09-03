@@ -15,14 +15,14 @@ python -m spacy download en
 
 ## Get the data
 To train on English, download:
-- the [OntoNote dataset](https://catalog.ldc.upenn.edu/ldc2013t19) from LDC, and
+- the [OntoNote dataset](https://catalog.ldc.upenn.edu/LDC2013T19) from LDC, and
 - the [CoNLL-2012 skeleton files](http://conll.cemantix.org/2012/data.html) from the CoNLL 2012 shared task site
 
 (If you want to train on another language, see the section [train on a new language](#train-on-a-new-language) below.)
 
 You will then need to combine the skeleton files with the OntoNotesfiles to get the `*._conll` text files which can be used as inputs for the training.
 
-To this aim, the [CoNLL 2012 shared task site](http://conll.cemantix.org/2012/data.html) supply processing scripts. I have updated them to fix some outdated dependencies and you will find the updated scripts in [conll_processing_scripts/](/neuralcoref/conll_processing_scripts/). To use the scripts, follow the instructions given on the [CoNLL 2012 shared task site](http://conll.cemantix.org/2012/data.html), i.e.
+To this aim, the [CoNLL 2012 shared task site](http://conll.cemantix.org/2012/data.html) supply processing scripts. I have updated them to fix some outdated dependencies and you will find the updated scripts in [conll_processing_scripts/](/neuralcoref/train/conll_processing_scripts/). To use the scripts, follow the instructions given on the [CoNLL 2012 shared task site](http://conll.cemantix.org/2012/data.html), i.e.
 ````bash
 skeleton2conll.sh  -D [path_to_ontonotes_train_folder] [path_to_skeleton_train_folder]
 skeleton2conll.sh  -D [path_to_ontonotes_test_folder] [path_to_skeleton_test_folder]
@@ -30,11 +30,11 @@ skeleton2conll.sh  -D [path_to_ontonotes_dev_folder] [path_to_skeleton_dev_folde
 ````
 
 ## Prepare the data
-Once you have the set of `*._conll` files, you can prepare the training data by running [conllparser.py](/neuralcoref/conllparser.py) on each split of the data set (train, test, dev) as
+Once you have the set of `*._conll` files, you can prepare the training data by running [conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (train, test, dev) as
 ````bash
-python -m neuralcoref.conllparser --path ./data/train/
-python -m neuralcoref.conllparser --path ./data/test/
-python -m neuralcoref.conllparser --path ./data/dev/
+python -m neuralcoref.train.conllparser --path ./data/train/
+python -m neuralcoref.train.conllparser --path ./data/test/
+python -m neuralcoref.train.conllparser --path ./data/dev/
 ````
 
 Conllparser will:
@@ -44,7 +44,7 @@ Conllparser will:
 - gather the mention features in a set of numpy arrays to be used as input for the neural net model.
 
 ## Train the model
-Once the files have been pre-processed (you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (train|test|dev) data folder), you can start the training process using [learn.py](/neuralcoref/learn.py), for example as
+Once the files have been pre-processed (you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (train|test|dev) data folder), you can start the training process using [learn.py](/neuralcoref/train/learn.py), for example as
 ````bash
 python -m neuralcoref.learn --train ./data/train/ --eval ./data/dev/
 ````
