@@ -1,3 +1,5 @@
+This is a fork of the NeuralCoref repository for doing some experiments with coreference alternatives.
+
 # ✨NeuralCoref 4.0: Coreference Resolution in spaCy with Neural Networks.
 
 NeuralCoref is a pipeline extension for spaCy 2.1+ which annotates and resolves coreference clusters using a neural network. NeuralCoref is production-ready, integrated in spaCy's NLP pipeline and extensible to new training datasets.
