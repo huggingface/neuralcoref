@@ -44,9 +44,10 @@ or by following these steps:
    * `cat conll-2012/v4/data/development/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> dev.my_lang.v4_gold_conll`
    * `cat conll-2012/v4/data/test/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> test.my_lang.v4_gold_conll`
    
-## Pre-process the data
+## Prepare the data
 Once you have the set of `*.v4_gold_conll` files, you can prepare the training data by running 
 [conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (train, test, dev) as
+
 ````bash
 python -m neuralcoref.train.conllparser --path ./data/train/
 python -m neuralcoref.train.conllparser --path ./data/test/
@@ -60,7 +61,9 @@ Conllparser will:
 - gather the mention features in a set of numpy arrays to be used as input for the neural net model.
 
 ## Train the model
-Once the files have been pre-processed (you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (train|test|dev) data folder), you can start the training process using [learn.py](/neuralcoref/train/learn.py), for example as
+Once the files have been pre-processed 
+(you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (train|test|dev) data folder), 
+you can start the training process using [learn.py](/neuralcoref/train/learn.py), for example as
 ````bash
 python -m neuralcoref.train.learn --train ./data/train/ --eval ./data/dev/
 ````
