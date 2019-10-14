@@ -14,23 +14,38 @@ python -m spacy download en
 ````
 
 ## Get the data
-To train on English, download:
-- the [OntoNote dataset](https://catalog.ldc.upenn.edu/LDC2013T19) from LDC, and
-- the [CoNLL-2012 skeleton files](http://conll.cemantix.org/2012/data.html) from the CoNLL 2012 shared task site
+The following assumes you want to train on English, Arabic or Chinese. 
+If you want to train on another language, see the section [train on a new language](#train-on-a-new-language) below.
 
-(If you want to train on another language, see the section [train on a new language](#train-on-a-new-language) below.)
+First, download the [OntoNotes 5.0 dataset](https://catalog.ldc.upenn.edu/LDC2013T19) from LDC.
 
-You will then need to combine the skeleton files with the OntoNotesfiles to get the `*._conll` text files which can be used as inputs for the training.
+Then, download the [CoNLL-2012 skeleton files](http://conll.cemantix.org/2012/data.html) from the CoNLL 2012 shared task site, 
+and combine these skeleton files with the OntoNotes files to get the `*._conll` text files which can be used as inputs for the training.
 
-To this aim, the [CoNLL 2012 shared task site](http://conll.cemantix.org/2012/data.html) supply processing scripts. I have updated them to fix some outdated dependencies and you will find the updated scripts in [conll_processing_scripts/](/neuralcoref/train/conll_processing_scripts/). To use the scripts, follow the instructions given on the [CoNLL 2012 shared task site](http://conll.cemantix.org/2012/data.html), i.e.
-````bash
-skeleton2conll.sh  -D [path_to_ontonotes_train_folder] [path_to_skeleton_train_folder]
-skeleton2conll.sh  -D [path_to_ontonotes_test_folder] [path_to_skeleton_test_folder]
-skeleton2conll.sh  -D [path_to_ontonotes_dev_folder] [path_to_skeleton_dev_folder]
-````
-
-## Prepare the data
-Once you have the set of `*._conll` files, you can prepare the training data by running [conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (train, test, dev) as
+This can be done by executing the script [compile_coref_data.sh](/neuralcoref/train/conll_processing_scripts/compile_coref_data.sh)
+or by following these steps:
+* From the [CoNLL 2012 download site](http://conll.cemantix.org/2012/download/), download and extract:
+   * http://conll.cemantix.org/2012/download/conll-2012-train.v4.tar.gz
+   * http://conll.cemantix.org/2012/download/conll-2012-development.v4.tar.gz
+   * http://conll.cemantix.org/2012/download/test/conll-2012-test-key.tar.gz
+   * http://conll.cemantix.org/2012/download/test/conll-2012-test-official.v9.tar.gz
+   * http://conll.cemantix.org/2012/download/conll-2012-scripts.v3.tar.gz
+   * http://conll.cemantix.org/download/reference-coreference-scorers.v8.01.tar.gz
+       * Move `reference-coreference-scorers` into the folder `conll-2012/` and rename to `scorer`  
+* If you are using Python 3.X, you have to edit the `conll-2012/v3/scripts/skeleton2conll.py` file   
+   * Change `except InvalidSexprException, e:` to `except InvalidSexprException as e`
+   * Change all `print ` statements to `print()`
+* Create the `*._conll` text files by executing
+   * `bash conll-2012/v3/scripts/skeleton2conll.sh -D path_to_ontonotes_folder/data/ conll-2012` (may take a little while)
+   * This will create `*.v4_gold_conll` files in each subdirectory of the `conll-2012` `data` folder.
+* Assemble the appropriate files into one large file each for training, dev testing and testing
+   * `my_lang` can be `english`, `arabic` or `chinese`
+   * `cat conll-2012/v4/data/train/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> train.my_lang.v4_gold_conll`
+   * `cat conll-2012/v4/data/development/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> dev.my_lang.v4_gold_conll`
+   * `cat conll-2012/v4/data/test/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> test.my_lang.v4_gold_conll`
+   
+## Pre-process the data
+Once you have the set of `*.v4_gold_conll` files, you can prepare the training data by running [conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (train, test, dev) as
 ````bash
 python -m neuralcoref.train.conllparser --path ./data/train/
 python -m neuralcoref.train.conllparser --path ./data/test/
