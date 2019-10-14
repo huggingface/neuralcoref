@@ -36,16 +36,17 @@ or by following these steps:
    * Change `except InvalidSexprException, e:` to `except InvalidSexprException as e`
    * Change all `print ` statements to `print()`
 * Create the `*._conll` text files by executing
-   * `bash conll-2012/v3/scripts/skeleton2conll.sh -D path_to_ontonotes_folder/data/ conll-2012` (may take a little while)
+   * `conll-2012/v3/scripts/skeleton2conll.sh -D path_to_ontonotes_folder/data/ conll-2012` (may take a little while)
    * This will create `*.v4_gold_conll` files in each subdirectory of the `conll-2012` `data` folder.
-* Assemble the appropriate files into one large file each for training, dev testing and testing
+* Assemble the appropriate files into one large file each for training, development and testing
    * `my_lang` can be `english`, `arabic` or `chinese`
    * `cat conll-2012/v4/data/train/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> train.my_lang.v4_gold_conll`
    * `cat conll-2012/v4/data/development/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> dev.my_lang.v4_gold_conll`
    * `cat conll-2012/v4/data/test/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> test.my_lang.v4_gold_conll`
    
 ## Pre-process the data
-Once you have the set of `*.v4_gold_conll` files, you can prepare the training data by running [conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (train, test, dev) as
+Once you have the set of `*.v4_gold_conll` files, you can prepare the training data by running 
+[conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (train, test, dev) as
 ````bash
 python -m neuralcoref.train.conllparser --path ./data/train/
 python -m neuralcoref.train.conllparser --path ./data/test/

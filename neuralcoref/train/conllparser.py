@@ -21,9 +21,9 @@ import numpy as np
 
 from tqdm import tqdm
 
-from .compat import unicode_
-from .document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
-from .utils import parallel_process
+from train.compat import unicode_
+from train.document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
+from train.utils import parallel_process
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]

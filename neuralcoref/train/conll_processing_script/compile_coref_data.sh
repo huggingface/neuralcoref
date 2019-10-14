@@ -12,7 +12,7 @@
 ONTONOTES_PATH=$1
 
 if [ ! -n "$ONTONOTES_PATH" ] ; then
-  echo "USAGE: bash compile_coref_data.sh /path/to/ontonotes/data"
+  echo "USAGE: ./compile_coref_data.sh /path/to/ontonotes/data"
   exit 1
 fi
 
