@@ -629,7 +629,13 @@ class ConllCorpus(object):
         n_mentions_list = []
         pairs_ant_index = 0
         pairs_start_index = 0
-        for n, p, arrays_dict in tqdm(arrays_dicts):
+        for npaidx in tqdm(range(len(arrays_dicts))):
+            try:
+                n, p, arrays_dict = arrays_dicts[npaidx]
+            except:
+                # empty array dict, cannot extract the dict values for this doc
+                continue
+
             for f in FEATURES_NAMES:
                 if gathering_dict[f] is None:
                     gathering_dict[f] = arrays_dict[f]
