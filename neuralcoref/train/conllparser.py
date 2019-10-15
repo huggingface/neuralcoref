@@ -309,8 +309,8 @@ class ConllDoc(Document):
         if use_gold_mentions:
             for coref in corefs:
                 #            print("coref['label']", coref['label'])
-                #            print("coref text",parsed[coref['start']:coref['end']])
-                mention = Mention(parsed[coref['start']:coref['end']], len(self.mentions), len(self.utterances),
+                #            print("coref text",parsed[coref['start']:coref['end']+1])
+                mention = Mention(parsed[coref['start']:coref['end']+1], len(self.mentions), len(self.utterances),
                                   self.n_sents, speaker=self.speakers[speaker_id], gold_label=coref['label'])
                 self.mentions.append(mention)
                 #            print("mention: ", mention, "label", mention.gold_label)
