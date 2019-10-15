@@ -22,7 +22,8 @@ import numpy as np
 from tqdm import tqdm
 
 from neuralcoref.train.compat import unicode_
-from neuralcoref.train.document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
+from neuralcoref.train.document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD, \
+    extract_mentions_spans
 from neuralcoref.train.utils import parallel_process
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
@@ -315,7 +316,9 @@ class ConllDoc(Document):
                 self.mentions.append(mention)
                 #            print("mention: ", mention, "label", mention.gold_label)
         else:
-            self._process_mentions(parsed, len(self.utterances), self.n_sents, self.speakers[speaker_id])
+            mentions_spans = extract_mentions_spans(doc=parsed, blacklist=self.blacklist)
+            self._process_mentions(mentions_spans, len(self.utterances), self.n_sents, self.speakers[speaker_id])
+
             # Assign a gold label to mentions which have one
             if debug: print("Check corefs", corefs)
             for i, coref in enumerate(corefs):
