@@ -11,7 +11,6 @@ import io
 import pickle
 
 import torch
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
 from neuralcoref.train.conllparser import FEATURES_NAMES

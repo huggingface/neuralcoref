@@ -328,15 +328,15 @@ def padder_collate(batch, debug=False):
             # Remark this mask is the inverse of the weights in the above target (used for evaluation masking)
             t_base = transposed_inputs[3]
             out_targets = torch.stack(
-                    [torch.cat([t.new(len(t)-1).zero_().byte(),
-                                t.new(max_pairs + 1 - len(t)).fill_(1).byte(),
-                                t.new(1).zero_().byte()]) if len(t) != max_pairs + 1 \
-                        else t.new(max_pairs + 1).zero_().byte() for t in t_base], 0)
+                    [torch.cat([t.new(len(t)-1).zero_().bool(),
+                                t.new(max_pairs + 1 - len(t)).fill_(1).bool(),
+                                t.new(1).zero_().bool()]) if len(t) != max_pairs + 1 \
+                        else t.new(max_pairs + 1).zero_().bool() for t in t_base], 0)
     else:
         out_inputs = [torch.stack(t_inp, 0) for t_inp in transposed_inputs]
         if transposed_targets is not None:
             out_targets = [torch.stack(t_targ, 0) for t_targ in transposed_targets]
             out_targets.append(out_targets[1].new(len(out_targets[1]), 1).fill_(1))
         else:
-            out_targets = out_inputs[0].new(len(out_inputs[0]), 1).zero_().byte()
+            out_targets = out_inputs[0].new(len(out_inputs[0]), 1).zero_().bool()
     return (out_inputs, out_targets)
