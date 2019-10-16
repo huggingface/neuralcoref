@@ -46,7 +46,7 @@ or by following these steps:
    
 ## Prepare the data
 Once you have the set of `*.v4_gold_conll` files, you can prepare the training data by running 
-[conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (train, test, dev) as
+[conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (`train`, `test`, `dev`) as
 
 ````bash
 python -m neuralcoref.train.conllparser --path ./data/train/
@@ -62,7 +62,7 @@ Conllparser will:
 
 ## Train the model
 Once the files have been pre-processed 
-(you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (train|test|dev) data folder), 
+(you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (`train`|`test`|`dev`) data folder), 
 you can start the training process using [learn.py](/neuralcoref/train/learn.py), for example as
 ````bash
 python -m neuralcoref.train.learn --train ./data/train/ --eval ./data/dev/
@@ -73,10 +73,14 @@ There many parameters and options for the training. You can list them with the u
 python -m neuralcoref.train.learn --help
 ````
 
-You can follow the training by running [Tensorboard for pyTorch](https://github.com/lanpa/tensorboard-pytorch) (it requires a version of Tensorflow, any version will be fine). Run it with `tensorboard --logdir runs`.
+You can follow the training by running [Tensorboard for pyTorch](https://github.com/lanpa/tensorboard-pytorch) 
+(it requires a version of Tensorflow, any version will be fine). Run it with `tensorboard --logdir runs`.
 
 ## Some details on the training
-The model and the training as thoroughfully described in our [very detailed blog post](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe). The training process is similar to the mention-ranking training described in [Clark and Manning (2016)](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf), namely:
+The model and the training as thoroughfully described in our 
+[very detailed blog post](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe). 
+The training process is similar to the mention-ranking training described in 
+[Clark and Manning (2016)](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf), namely:
 - A first step of training uses a standard cross entropy loss on the mention pair labels,
 - A second step of training uses a cross entropy loss on the top pairs only, and
 - A third step of training using a slack-rescaled ranking loss.

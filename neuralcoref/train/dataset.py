@@ -14,10 +14,10 @@ import torch.utils.data
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset
 
-from neuralcoref.utils import (encode_distance, BATCH_SIZE_PATH, SIZE_FP,
+from neuralcoref.train.utils import (encode_distance, BATCH_SIZE_PATH, SIZE_FP,
                                SIZE_FP_COMPRESSED, SIZE_FS, SIZE_FS_COMPRESSED,
                                SIZE_GENRE, SIZE_PAIR_IN, SIZE_SINGLE_IN)
-from neuralcoref.conllparser import FEATURES_NAMES
+from neuralcoref.train.conllparser import FEATURES_NAMES
 
 def load_embeddings_from_file(name):
     print("loading", name+"_embeddings.npy")

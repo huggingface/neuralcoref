@@ -6,14 +6,13 @@
 from __future__ import unicode_literals
 from __future__ import print_function
 
-import sys
 import os
 import spacy
 import numpy as np
 
-from neuralcoref.utils import PACKAGE_DIRECTORY, SIZE_PAIR_IN, SIZE_SINGLE_IN
-from neuralcoref.compat import unicode_
-from neuralcoref.document import Document, MENTION_TYPE, NO_COREF_LIST
+from neuralcoref.train.utils import PACKAGE_DIRECTORY, SIZE_SINGLE_IN
+from neuralcoref.train.compat import unicode_
+from neuralcoref.train.document import Document, MENTION_TYPE, NO_COREF_LIST
 
 #######################
 ##### UTILITIES #######
