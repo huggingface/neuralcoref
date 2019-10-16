@@ -10,6 +10,7 @@ import io
 #import concurrent.futures
 import pickle
 
+import torch
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
@@ -133,7 +134,8 @@ class ConllEvaluator(object):
     ########################
     def get_max_score(self, batch, debug=False):
         inputs, mask = batch
-        inputs = tuple(Variable(i, volatile=True) for i in inputs)
+        with torch.no_grad():
+            inputs = tuple(i for i in inputs)
         if self.cuda:
             inputs = tuple(i.cuda() for i in inputs)
             mask = mask.cuda()
