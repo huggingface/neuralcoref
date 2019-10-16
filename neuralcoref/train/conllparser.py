@@ -291,7 +291,7 @@ class ConllDoc(Document):
             lookup.append(c_lookup)
         return lookup
 
-    def add_conll_utterance(self, parsed, tokens, corefs, speaker_id, use_gold_mentions=False, debug=False):
+    def add_conll_utterance(self, parsed, tokens, corefs, speaker_id, use_gold_mentions, debug=False):
         conll_lookup = self.get_conll_spacy_lookup(tokens, parsed)
         self.conll_tokens.append(tokens)
         self.conll_lookup.append(conll_lookup)
@@ -372,7 +372,7 @@ class ConllDoc(Document):
                  ]
         return feat_l
 
-    def get_feature_array(self, doc_id, feature=None, compressed=True, debug=True):
+    def get_feature_array(self, doc_id, feature=None, compressed=True, debug=False):
         """
         Prepare feature array:
             mentions_spans: (N, S)
@@ -386,7 +386,7 @@ class ConllDoc(Document):
             pairs_ant_idx: (P, 1) => indexes of antecedents mention for each pair (mention index in doc)
         """ 
         if not self.mentions:
-            print("No mention in this doc !")
+            if debug: print("No mention in this doc !")
             return {}
         if debug: print("🛎 features matrices")
         mentions_spans = []
@@ -572,8 +572,8 @@ class ConllCorpus(object):
             doc_list = parallel_process(cleaned_file_list, load_file)
             for docs in doc_list:#executor.map(self.load_file, cleaned_file_list):
                 for utts_text, utt_tokens, utts_corefs, utts_speakers, name, part in docs:
-                    print("Imported", name)
                     if debug:
+                        print("Imported", name)
                         print("utts_text", utts_text)
                         print("utt_tokens", utt_tokens)
                         print("utts_corefs", utts_corefs)
@@ -628,10 +628,10 @@ class ConllCorpus(object):
                                                   use_gold_mentions=self.use_gold_mentions)
 
     def build_and_gather_multiple_arrays(self, save_path):
-        print("🌋 Extracting mentions features")
+        print("🌋 Extracting mentions features with {} job(s)".format(self.n_jobs))
         parallel_process(self.docs, set_feats, n_jobs=self.n_jobs)
 
-        print("🌋 Building and gathering arrays")
+        print("🌋 Building and gathering array with {} job(s)".format(self.n_jobs))
         arr =[{'doc': doc,
                'i': i} for i, doc in enumerate(self.docs)]
         arrays_dicts = parallel_process(arr, get_feats, use_kwargs=True, n_jobs=self.n_jobs)
@@ -656,20 +656,26 @@ class ConllCorpus(object):
             n_mentions_list.append(n)
 
         for feature in FEATURES_NAMES[:9]:
-            print("Building numpy array for", feature, "length", len(gathering_dict[feature]))
+            feature_data = gathering_dict[feature]
+            if not feature_data:
+                print("No data for", feature)
+                continue
+            print("Building numpy array for", feature, "length", len(feature_data))
             if feature != "mentions_spans":
-                array = np.array(gathering_dict[feature])
+                array = np.array(feature_data)
                 if array.ndim == 1:
                     array = np.expand_dims(array, axis=1)
             else:
-                array = np.stack(gathering_dict[feature])
+                array = np.stack(feature_data)
             # check_numpy_array(feature, array, n_mentions_list)
             print("Saving numpy", feature, "size", array.shape)
             np.save(save_path + feature, array)
         for feature in FEATURES_NAMES[9:]:
-            print("Saving pickle", feature, "size", len(gathering_dict[feature]))
-            with open(save_path + feature + '.bin', "wb") as fp:  
-                pickle.dump(gathering_dict[feature], fp)
+            feature_data = gathering_dict[feature]
+            if feature_data:
+                print("Saving pickle", feature, "size", len(feature_data))
+                with open(save_path + feature + '.bin', "wb") as fp:
+                    pickle.dump(feature_data, fp)
 
     def save_vocabulary(self, save_path, debug=False):
         def _vocabulary_to_file(path, vocabulary):
@@ -728,13 +734,16 @@ if __name__ == '__main__':
         start_time = time.time()
         CORPUS.read_corpus(args.path)
         print('=> read_corpus time elapsed', time.time() - start_time)
-        start_time2 = time.time()
-        CORPUS.build_and_gather_multiple_arrays(SAVE_DIR)
-        print('=> build_and_gather_multiple_arrays time elapsed', time.time() - start_time2)
-        start_time2 = time.time()
-        CORPUS.save_vocabulary(SAVE_DIR)
-        print('=> save_vocabulary time elapsed', time.time() - start_time2)
-        print('=> total time elapsed', time.time() - start_time)
+        if not CORPUS.docs:
+            print("Could not parse any valid docs")
+        else:
+            start_time2 = time.time()
+            CORPUS.build_and_gather_multiple_arrays(SAVE_DIR)
+            print('=> build_and_gather_multiple_arrays time elapsed', time.time() - start_time2)
+            start_time2 = time.time()
+            CORPUS.save_vocabulary(SAVE_DIR)
+            print('=> save_vocabulary time elapsed', time.time() - start_time2)
+            print('=> total time elapsed', time.time() - start_time)
     if args.function == 'key' or args.function == 'all':
         CORPUS.build_key_file(args.path, args.key)
     if args.function == 'find_undetected':
