@@ -31,11 +31,11 @@ class Model(nn.Module):
     def init_weights(self):
         w = (param.data for name, param in self.named_parameters() if 'weight' in name)
         b = (param.data for name, param in self.named_parameters() if 'bias' in name)
-        nn.init.uniform(self.word_embeds.weight.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.word_embeds.weight.data, a=-0.5, b=0.5)
         for t in w:
-            nn.init.xavier_uniform(t)
+            nn.init.xavier_uniform_(t)
         for t in b:
-            nn.init.constant(t, 0)
+            nn.init.constant_(t, 0)
 
     def load_embeddings(self, preloaded_weights):
         self.word_embeds.weight = nn.Parameter(preloaded_weights)

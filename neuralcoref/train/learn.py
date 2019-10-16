@@ -271,8 +271,8 @@ def run_model(args):
 if __name__ == '__main__':
     DIR_PATH = os.path.dirname(os.path.realpath(__file__))
     parser = argparse.ArgumentParser(description='Training the neural coreference model')
-    parser.add_argument('--train', type=str, default=DIR_PATH + '/data/tiny/', help='Path to the train dataset')
-    parser.add_argument('--eval', type=str, default=DIR_PATH + '/data/tiny/', help='Path to the eval dataset')
+    parser.add_argument('--train', type=str, default=DIR_PATH + '/data/', help='Path to the train dataset')
+    parser.add_argument('--eval', type=str, default=DIR_PATH + '/data/', help='Path to the eval dataset')
     parser.add_argument('--evalkey', type=str, help='Path to an optional key file for scoring')
     parser.add_argument('--weights', type=str, help='Path to pre-trained weights (if you only want to test the scoring for e.g.)')
     parser.add_argument('--batchsize', type=int, default=20000, help='Size of a batch in total number of pairs')
