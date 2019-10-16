@@ -310,8 +310,8 @@ class ConllDoc(Document):
         if use_gold_mentions:
             for coref in corefs:
                 #            print("coref['label']", coref['label'])
-                #            print("coref text",parsed[coref['start']:coref['end']])
-                mention = Mention(parsed[coref['start']:coref['end']], len(self.mentions), len(self.utterances),
+                #            print("coref text",parsed[coref['start']:coref['end']+1])
+                mention = Mention(parsed[coref['start']:coref['end']+1], len(self.mentions), len(self.utterances),
                                   self.n_sents, speaker=self.speakers[speaker_id], gold_label=coref['label'])
                 self.mentions.append(mention)
                 #            print("mention: ", mention, "label", mention.gold_label)
@@ -639,7 +639,13 @@ class ConllCorpus(object):
         n_mentions_list = []
         pairs_ant_index = 0
         pairs_start_index = 0
-        for n, p, arrays_dict in tqdm(arrays_dicts):
+        for npaidx in tqdm(range(len(arrays_dicts))):
+            try:
+                n, p, arrays_dict = arrays_dicts[npaidx]
+            except:
+                # empty array dict, cannot extract the dict values for this doc
+                continue
+
             for f in FEATURES_NAMES:
                 if gathering_dict[f] is None:
                     gathering_dict[f] = arrays_dict[f]
