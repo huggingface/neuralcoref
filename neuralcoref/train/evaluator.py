@@ -111,7 +111,7 @@ class ConllEvaluator(object):
                         print("Cluster found", key)
                         print("Corefs:", "|".join(str(self.docs[doc_idx]['mentions'][m_idx]) \
                               + " (" + str(m_idx) + ")" for m_idx in l))
-            if not kept:
+            if not kept and debug:
                 print("❄️ No coreference found")
             for rem in remove_id:
                 del self.clusters[doc_idx][rem]
