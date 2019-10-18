@@ -133,15 +133,15 @@ class ConllEvaluator(object):
     ########################
     def get_max_score(self, batch, debug=False):
         inputs, mask = batch
-        with torch.no_grad():
-            inputs = tuple(i for i in inputs)
+        inputs = tuple(i for i in inputs)
         if self.cuda:
             inputs = tuple(i.cuda() for i in inputs)
             mask = mask.cuda()
         self.model.eval()
-        scores = self.model.forward(inputs, concat_axis=1).data
-        scores.masked_fill_(mask, -float('Inf'))
-        _, max_idx = scores.max(dim=1) # We may want to weight the single score with coref.greedyness
+        with torch.no_grad():
+            scores = self.model(inputs, concat_axis=1)
+            scores.masked_fill_(mask, -float('Inf'))
+            _, max_idx = scores.max(dim=1) # We may want to weight the single score with coref.greedyness
         if debug:
             print("Max_idx", max_idx)
         return scores.cpu().numpy(), max_idx.cpu().numpy()
