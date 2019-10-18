@@ -6,8 +6,6 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 import re
-import sys
-import codecs
 import argparse
 import time
 import os
@@ -15,7 +13,6 @@ import io
 import pickle
 
 import spacy
-from spacy.tokens import Doc
 
 import numpy as np
 

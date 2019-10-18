@@ -299,7 +299,7 @@ if __name__ == '__main__':
     parser.add_argument('--all_pairs_l2', type=float, default=1e-6, help='all pairs pre-training l2 regularization')
     parser.add_argument('--top_pairs_l2', type=float, default=1e-5, help='top pairs pre-training l2 regularization')
     parser.add_argument('--ranking_l2', type=float, default=1e-5, help='ranking training l2 regularization')
-    parser.add_argument('--patience', type=int, default=3, help='patience (epochs) before considering evaluationhas decreased')
+    parser.add_argument('--patience', type=int, default=3, help='patience (epochs) before considering evaluation has decreased')
     parser.add_argument('--min_lr', type=float, default=2e-8, help='min learning rate')
     parser.add_argument('--on_eval_decrease', type=str, default='nothing',
                         help='What to do when evaluation decreases ("nothing", "divide_lr", "next_stage", "divide_then_next")')
