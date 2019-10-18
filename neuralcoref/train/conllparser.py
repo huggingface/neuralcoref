@@ -594,7 +594,7 @@ class ConllCorpus(object):
                                       embedding_extractor=self.embed_extractor,
                                       conll=CONLL_GENRES[name[:2]]))
         print("🌋 Loading spacy model")
-        model_options = ['en_core_web_sm', 'en', 'en_core_web_md', 'en_core_web_lg']
+        model_options = ['en_core_web_lg', 'en_core_web_md', 'en_core_web_sm', 'en']
         model = None
         for model_option in model_options:
             if not model:
