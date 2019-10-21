@@ -40,7 +40,7 @@ MAX_ITER = 100
 ## MENTION EXTRACTION ###
 #########################
 
-def extract_mentions_spans(doc, blacklist=True, debug=False):
+def extract_mentions_spans(doc, blacklist, debug=False):
     '''
     Extract potential mentions from a spacy parsed Doc
     '''

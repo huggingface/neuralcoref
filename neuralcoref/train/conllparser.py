@@ -306,12 +306,12 @@ class ConllDoc(Document):
             self.speakers[speaker_id] = Speaker(speaker_id, speaker_name)
         if use_gold_mentions:
             for coref in corefs:
-                #            print("coref['label']", coref['label'])
-                #            print("coref text",parsed[coref['start']:coref['end']+1])
+                # print("coref['label']", coref['label'])
+                # print("coref text",parsed[coref['start']:coref['end']+1])
                 mention = Mention(parsed[coref['start']:coref['end']+1], len(self.mentions), len(self.utterances),
                                   self.n_sents, speaker=self.speakers[speaker_id], gold_label=coref['label'])
                 self.mentions.append(mention)
-                #            print("mention: ", mention, "label", mention.gold_label)
+                # print("mention: ", mention, "label", mention.gold_label)
         else:
             mentions_spans = extract_mentions_spans(doc=parsed, blacklist=self.blacklist)
             self._process_mentions(mentions_spans, len(self.utterances), self.n_sents, self.speakers[speaker_id])
@@ -447,7 +447,7 @@ class ConllDoc(Document):
 ###################
 ### ConllCorpus #####
 class ConllCorpus(object):
-    def __init__(self, n_jobs=4, embed_path=PACKAGE_DIRECTORY+"/weights/", use_gold_mentions=False):
+    def __init__(self, n_jobs=4, embed_path=PACKAGE_DIRECTORY+"/weights/", gold_mentions=False, blacklist=False):
         self.n_jobs = n_jobs
         self.features = {}
         self.utts_text = []
@@ -461,7 +461,8 @@ class ConllCorpus(object):
             self.embed_extractor = EmbeddingExtractor(embed_path)
         self.trainable_embed = []
         self.trainable_voc = []
-        self.use_gold_mentions = use_gold_mentions
+        self.gold_mentions = gold_mentions
+        self.blacklist = blacklist
 
     def check_words_in_embeddings_voc(self, embedding, tuned=True, debug=False):
         print("🌋 Checking if words are in embedding voc")
@@ -590,7 +591,7 @@ class ConllCorpus(object):
         print("🌋 Building docs")
         for name, part in self.docs_names:
             self.docs.append(ConllDoc(name=name, part=part, nlp=None,
-                                      blacklist=False, consider_speakers=True,
+                                      blacklist=self.blacklist, consider_speakers=True,
                                       embedding_extractor=self.embed_extractor,
                                       conll=CONLL_GENRES[name[:2]]))
         print("🌋 Loading spacy model")
@@ -609,7 +610,7 @@ class ConllCorpus(object):
             return
 
         nlp = spacy.load(model)
-        print("🌋 Parsing utterances and filling docs with use_gold_mentions=" + (str(bool(self.use_gold_mentions))))
+        print("🌋 Parsing utterances and filling docs with use_gold_mentions=" + (str(bool(self.gold_mentions))))
         doc_iter = (s for s in self.utts_text)
         for utt_tuple in tqdm(zip(nlp.pipe(doc_iter),
                                            self.utts_tokens, self.utts_corefs,
@@ -622,7 +623,7 @@ class ConllCorpus(object):
                           " speaker " + unicode_(speaker) + "doc_id" + unicode_(doc_id)
                 print(out_str.encode('utf-8'))
             self.docs[doc_id].add_conll_utterance(doc, conll_tokens, corefs, speaker,
-                                                  use_gold_mentions=self.use_gold_mentions)
+                                                  use_gold_mentions=self.gold_mentions)
 
     def build_and_gather_multiple_arrays(self, save_path):
         print("🌋 Extracting mentions features with {} job(s)".format(self.n_jobs))
@@ -720,10 +721,11 @@ if __name__ == '__main__':
     parser.add_argument('--key', type=str, help='Path to an optional key file for scoring')
     parser.add_argument('--n_jobs', type=int, default=1, help='Number of parallel jobs (default 1)')
     parser.add_argument('--gold_mentions', type=int, default=0, help='Use gold mentions (1) or not (0, default)')
+    parser.add_argument('--blacklist', type=int, default=0, help='Use blacklist (1) or not (0, default)')
     args = parser.parse_args()
     if args.key is None:
         args.key = args.path + "/key.txt"
-    CORPUS = ConllCorpus(n_jobs=args.n_jobs, use_gold_mentions=args.gold_mentions)
+    CORPUS = ConllCorpus(n_jobs=args.n_jobs, gold_mentions=args.gold_mentions, blacklist=args.blacklist)
     if args.function == 'parse' or args.function == 'all':
         SAVE_DIR = args.path + "/numpy/"
         if not os.path.exists(SAVE_DIR):
