@@ -609,7 +609,7 @@ class ConllCorpus(object):
             return
 
         nlp = spacy.load(model)
-        print("🌋 Parsing utterances and filling docs")
+        print("🌋 Parsing utterances and filling docs with use_gold_mentions=" + (str(bool(self.use_gold_mentions))))
         doc_iter = (s for s in self.utts_text)
         for utt_tuple in tqdm(zip(nlp.pipe(doc_iter),
                                            self.utts_tokens, self.utts_corefs,
@@ -719,10 +719,11 @@ if __name__ == '__main__':
     parser.add_argument('--path', type=str, default=DIR_PATH + '/data/', help='Path to the dataset')
     parser.add_argument('--key', type=str, help='Path to an optional key file for scoring')
     parser.add_argument('--n_jobs', type=int, default=1, help='Number of parallel jobs (default 1)')
+    parser.add_argument('--gold_mentions', type=int, default=0, help='Use gold mentions (1) or not (0, default)')
     args = parser.parse_args()
     if args.key is None:
         args.key = args.path + "/key.txt"
-    CORPUS = ConllCorpus(n_jobs=args.n_jobs)
+    CORPUS = ConllCorpus(n_jobs=args.n_jobs, use_gold_mentions=args.gold_mentions)
     if args.function == 'parse' or args.function == 'all':
         SAVE_DIR = args.path + "/numpy/"
         if not os.path.exists(SAVE_DIR):
