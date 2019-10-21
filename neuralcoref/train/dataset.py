@@ -95,8 +95,8 @@ class NCDataset(Dataset):
 
         """
         features_raw, label, pairs_length, pairs_start_index, spans, words = self.mentions[mention_idx]
-        pairs_start_index = np.asscalar(pairs_start_index)
-        pairs_length = np.asscalar(pairs_length)
+        pairs_start_index = pairs_start_index.item()
+        pairs_length = pairs_length.item()
 
         # Build features array (float) from raw features (int)
         assert features_raw.shape[0] == SIZE_FS_COMPRESSED
@@ -141,7 +141,7 @@ class NCDataset(Dataset):
         pairs_features[:, 17:28] = encode_distance(pairs_features_raw[:, 7])
         pairs_features[:, 28] = pairs_features_raw[:, 8]
         # prepare antecent features
-        ant_features_raw = np.concatenate([self.mentions[np.asscalar(idx)][0][np.newaxis, :] for idx in pairs_ant_index])
+        ant_features_raw = np.concatenate([self.mentions[idx.item()][0][np.newaxis, :] for idx in pairs_ant_index])
         ant_features = np.zeros((pairs_length, SIZE_FS-SIZE_GENRE))
         ant_features[:, ant_features_raw[:, 0]] = 1
         ant_features[:, 4:15] = encode_distance(ant_features_raw[:, 1])
@@ -152,8 +152,8 @@ class NCDataset(Dataset):
         ana_features = np.tile(features, (pairs_length, 1))
         pairs_features[:, 46:] = ana_features
 
-        ant_spans = np.concatenate([self.mentions[np.asscalar(idx)][4][np.newaxis, :] for idx in pairs_ant_index])
-        ant_words = np.concatenate([self.mentions[np.asscalar(idx)][5][np.newaxis, :] for idx in pairs_ant_index])
+        ant_spans = np.concatenate([self.mentions[idx.item()][4][np.newaxis, :] for idx in pairs_ant_index])
+        ant_words = np.concatenate([self.mentions[idx.item()][5][np.newaxis, :] for idx in pairs_ant_index])
         ana_spans = np.tile(spans, (pairs_length, 1))
         ana_words = np.tile(words, (pairs_length, 1))
         ant_spans = torch.from_numpy(ant_spans).float()
