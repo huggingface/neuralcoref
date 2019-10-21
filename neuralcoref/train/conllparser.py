@@ -666,7 +666,7 @@ class ConllCorpus(object):
                 continue
             print("Building numpy array for", feature, "length", len(feature_data))
             if feature != "mentions_spans":
-                array = np.array(feature_data)
+                array = np.array(feature_data, dtype=np.uint64)
                 if array.ndim == 1:
                     array = np.expand_dims(array, axis=1)
             else:
