@@ -10,13 +10,12 @@ import io
 #import concurrent.futures
 import pickle
 
-from torch.autograd import Variable
+import torch
 from torch.utils.data import DataLoader
 
-#from algorithm import Coref
-from neuralcoref.conllparser import FEATURES_NAMES
-from neuralcoref.dataset import NCBatchSampler, padder_collate
-from neuralcoref.compat import unicode_
+from neuralcoref.train.conllparser import FEATURES_NAMES
+from neuralcoref.train.dataset import NCBatchSampler, padder_collate
+from neuralcoref.train.compat import unicode_
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
@@ -112,7 +111,7 @@ class ConllEvaluator(object):
                         print("Cluster found", key)
                         print("Corefs:", "|".join(str(self.docs[doc_idx]['mentions'][m_idx]) \
                               + " (" + str(m_idx) + ")" for m_idx in l))
-            if not kept:
+            if not kept and debug:
                 print("❄️ No coreference found")
             for rem in remove_id:
                 del self.clusters[doc_idx][rem]
@@ -134,14 +133,14 @@ class ConllEvaluator(object):
     ########################
     def get_max_score(self, batch, debug=False):
         inputs, mask = batch
-        inputs = tuple(Variable(i, volatile=True) for i in inputs)
         if self.cuda:
             inputs = tuple(i.cuda() for i in inputs)
             mask = mask.cuda()
         self.model.eval()
-        scores = self.model.forward(inputs, concat_axis=1).data
-        scores.masked_fill_(mask, -float('Inf'))
-        _, max_idx = scores.max(dim=1) # We may want to weight the single score with coref.greedyness
+        with torch.no_grad():
+            scores = self.model(inputs, concat_axis=1)
+            scores.masked_fill_(mask, -float('Inf'))
+            _, max_idx = scores.max(dim=1) # We may want to weight the single score with coref.greedyness
         if debug:
             print("Max_idx", max_idx)
         return scores.cpu().numpy(), max_idx.cpu().numpy()
@@ -159,7 +158,6 @@ class ConllEvaluator(object):
         self.dataloader.dataset.no_targets = True
         if not print_all_mentions:
             print("🌋 Build coreference clusters")
-            cur_m = 0
             for sample_batched, mentions_idx, n_pairs_l in zip(self.dataloader, self.mentions_idx, self.n_pairs):
                 scores, max_i = self.get_max_score(sample_batched)
                 for m_idx, ind, n_pairs in zip(mentions_idx, max_i, n_pairs_l):

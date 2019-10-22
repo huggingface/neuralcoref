@@ -15,6 +15,7 @@ neuralcoref/*.html
 Profile.prof
 .vscode
 .sass-cache
+.idea/*
 
 # Python
 /.Python

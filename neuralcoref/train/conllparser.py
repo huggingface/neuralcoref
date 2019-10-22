@@ -6,8 +6,6 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 import re
-import sys
-import codecs
 import argparse
 import time
 import os
@@ -15,15 +13,15 @@ import io
 import pickle
 
 import spacy
-from spacy.tokens import Doc
 
 import numpy as np
 
 from tqdm import tqdm
 
-from .compat import unicode_
-from .document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD
-from .utils import parallel_process
+from neuralcoref.train.compat import unicode_
+from neuralcoref.train.document import Mention, Document, Speaker, EmbeddingExtractor, MISSING_WORD, \
+    extract_mentions_spans
+from neuralcoref.train.utils import parallel_process
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]
@@ -290,7 +288,7 @@ class ConllDoc(Document):
             lookup.append(c_lookup)
         return lookup
 
-    def add_conll_utterance(self, parsed, tokens, corefs, speaker_id, use_gold_mentions=False, debug=False):
+    def add_conll_utterance(self, parsed, tokens, corefs, speaker_id, use_gold_mentions, debug=False):
         conll_lookup = self.get_conll_spacy_lookup(tokens, parsed)
         self.conll_tokens.append(tokens)
         self.conll_lookup.append(conll_lookup)
@@ -308,14 +306,16 @@ class ConllDoc(Document):
             self.speakers[speaker_id] = Speaker(speaker_id, speaker_name)
         if use_gold_mentions:
             for coref in corefs:
-                #            print("coref['label']", coref['label'])
-                #            print("coref text",parsed[coref['start']:coref['end']+1])
+                # print("coref['label']", coref['label'])
+                # print("coref text",parsed[coref['start']:coref['end']+1])
                 mention = Mention(parsed[coref['start']:coref['end']+1], len(self.mentions), len(self.utterances),
                                   self.n_sents, speaker=self.speakers[speaker_id], gold_label=coref['label'])
                 self.mentions.append(mention)
-                #            print("mention: ", mention, "label", mention.gold_label)
+                # print("mention: ", mention, "label", mention.gold_label)
         else:
-            self._extract_mentions(parsed, len(self.utterances), self.n_sents, self.speakers[speaker_id])
+            mentions_spans = extract_mentions_spans(doc=parsed, blacklist=self.blacklist)
+            self._process_mentions(mentions_spans, len(self.utterances), self.n_sents, self.speakers[speaker_id])
+
             # Assign a gold label to mentions which have one
             if debug: print("Check corefs", corefs)
             for i, coref in enumerate(corefs):
@@ -369,7 +369,7 @@ class ConllDoc(Document):
                  ]
         return feat_l
 
-    def get_feature_array(self, doc_id, feature=None, compressed=True, debug=True):
+    def get_feature_array(self, doc_id, feature=None, compressed=True, debug=False):
         """
         Prepare feature array:
             mentions_spans: (N, S)
@@ -383,7 +383,7 @@ class ConllDoc(Document):
             pairs_ant_idx: (P, 1) => indexes of antecedents mention for each pair (mention index in doc)
         """ 
         if not self.mentions:
-            print("No mention in this doc !")
+            if debug: print("No mention in this doc !")
             return {}
         if debug: print("🛎 features matrices")
         mentions_spans = []
@@ -447,7 +447,7 @@ class ConllDoc(Document):
 ###################
 ### ConllCorpus #####
 class ConllCorpus(object):
-    def __init__(self, n_jobs=4, embed_path=PACKAGE_DIRECTORY+"/weights/", use_gold_mentions=False):
+    def __init__(self, n_jobs=4, embed_path=PACKAGE_DIRECTORY+"/weights/", gold_mentions=False, blacklist=False):
         self.n_jobs = n_jobs
         self.features = {}
         self.utts_text = []
@@ -461,7 +461,8 @@ class ConllCorpus(object):
             self.embed_extractor = EmbeddingExtractor(embed_path)
         self.trainable_embed = []
         self.trainable_voc = []
-        self.use_gold_mentions = use_gold_mentions
+        self.gold_mentions = gold_mentions
+        self.blacklist = blacklist
 
     def check_words_in_embeddings_voc(self, embedding, tuned=True, debug=False):
         print("🌋 Checking if words are in embedding voc")
@@ -569,8 +570,8 @@ class ConllCorpus(object):
             doc_list = parallel_process(cleaned_file_list, load_file)
             for docs in doc_list:#executor.map(self.load_file, cleaned_file_list):
                 for utts_text, utt_tokens, utts_corefs, utts_speakers, name, part in docs:
-                    print("Imported", name)
                     if debug:
+                        print("Imported", name)
                         print("utts_text", utts_text)
                         print("utt_tokens", utt_tokens)
                         print("utts_corefs", utts_corefs)
@@ -590,19 +591,26 @@ class ConllCorpus(object):
         print("🌋 Building docs")
         for name, part in self.docs_names:
             self.docs.append(ConllDoc(name=name, part=part, nlp=None,
-                                      blacklist=False, consider_speakers=True,
+                                      blacklist=self.blacklist, consider_speakers=True,
                                       embedding_extractor=self.embed_extractor,
                                       conll=CONLL_GENRES[name[:2]]))
         print("🌋 Loading spacy model")
-        try:
-            spacy.info('en_core_web_sm')
-            model = 'en_core_web_sm'
-        except IOError:
-            print("No spacy 2 model detected, using spacy1 'en' model")
-            spacy.info('en')
-            model = 'en'
+        model_options = ['en_core_web_lg', 'en_core_web_md', 'en_core_web_sm', 'en']
+        model = None
+        for model_option in model_options:
+            if not model:
+                try:
+                    spacy.info(model_option)
+                    model = model_option
+                    print("Loaded model", model_option)
+                except:
+                    print("Could not detect model", model_option)
+        if not model:
+            print("Could not detect any suitable English model")
+            return
+
         nlp = spacy.load(model)
-        print("🌋 Parsing utterances and filling docs")
+        print("🌋 Parsing utterances and filling docs with use_gold_mentions=" + (str(bool(self.gold_mentions))))
         doc_iter = (s for s in self.utts_text)
         for utt_tuple in tqdm(zip(nlp.pipe(doc_iter),
                                            self.utts_tokens, self.utts_corefs,
@@ -615,13 +623,13 @@ class ConllCorpus(object):
                           " speaker " + unicode_(speaker) + "doc_id" + unicode_(doc_id)
                 print(out_str.encode('utf-8'))
             self.docs[doc_id].add_conll_utterance(doc, conll_tokens, corefs, speaker,
-                                                  use_gold_mentions=self.use_gold_mentions)
+                                                  use_gold_mentions=self.gold_mentions)
 
     def build_and_gather_multiple_arrays(self, save_path):
-        print("🌋 Extracting mentions features")
+        print("🌋 Extracting mentions features with {} job(s)".format(self.n_jobs))
         parallel_process(self.docs, set_feats, n_jobs=self.n_jobs)
 
-        print("🌋 Building and gathering arrays")
+        print("🌋 Building and gathering array with {} job(s)".format(self.n_jobs))
         arr =[{'doc': doc,
                'i': i} for i, doc in enumerate(self.docs)]
         arrays_dicts = parallel_process(arr, get_feats, use_kwargs=True, n_jobs=self.n_jobs)
@@ -652,20 +660,26 @@ class ConllCorpus(object):
             n_mentions_list.append(n)
 
         for feature in FEATURES_NAMES[:9]:
-            print("Building numpy array for", feature, "length", len(gathering_dict[feature]))
+            feature_data = gathering_dict[feature]
+            if not feature_data:
+                print("No data for", feature)
+                continue
+            print("Building numpy array for", feature, "length", len(feature_data))
             if feature != "mentions_spans":
-                array = np.array(gathering_dict[feature])
+                array = np.array(feature_data)
                 if array.ndim == 1:
                     array = np.expand_dims(array, axis=1)
             else:
-                array = np.stack(gathering_dict[feature])
+                array = np.stack(feature_data)
             # check_numpy_array(feature, array, n_mentions_list)
             print("Saving numpy", feature, "size", array.shape)
             np.save(save_path + feature, array)
         for feature in FEATURES_NAMES[9:]:
-            print("Saving pickle", feature, "size", len(gathering_dict[feature]))
-            with open(save_path + feature + '.bin', "wb") as fp:  
-                pickle.dump(gathering_dict[feature], fp)
+            feature_data = gathering_dict[feature]
+            if feature_data:
+                print("Saving pickle", feature, "size", len(feature_data))
+                with open(save_path + feature + '.bin', "wb") as fp:
+                    pickle.dump(feature_data, fp)
 
     def save_vocabulary(self, save_path, debug=False):
         def _vocabulary_to_file(path, vocabulary):
@@ -706,10 +720,12 @@ if __name__ == '__main__':
     parser.add_argument('--path', type=str, default=DIR_PATH + '/data/', help='Path to the dataset')
     parser.add_argument('--key', type=str, help='Path to an optional key file for scoring')
     parser.add_argument('--n_jobs', type=int, default=1, help='Number of parallel jobs (default 1)')
+    parser.add_argument('--gold_mentions', type=int, default=0, help='Use gold mentions (1) or not (0, default)')
+    parser.add_argument('--blacklist', type=int, default=0, help='Use blacklist (1) or not (0, default)')
     args = parser.parse_args()
     if args.key is None:
         args.key = args.path + "/key.txt"
-    CORPUS = ConllCorpus(n_jobs=args.n_jobs)
+    CORPUS = ConllCorpus(n_jobs=args.n_jobs, gold_mentions=args.gold_mentions, blacklist=args.blacklist)
     if args.function == 'parse' or args.function == 'all':
         SAVE_DIR = args.path + "/numpy/"
         if not os.path.exists(SAVE_DIR):
@@ -724,13 +740,16 @@ if __name__ == '__main__':
         start_time = time.time()
         CORPUS.read_corpus(args.path)
         print('=> read_corpus time elapsed', time.time() - start_time)
-        start_time2 = time.time()
-        CORPUS.build_and_gather_multiple_arrays(SAVE_DIR)
-        print('=> build_and_gather_multiple_arrays time elapsed', time.time() - start_time2)
-        start_time2 = time.time()
-        CORPUS.save_vocabulary(SAVE_DIR)
-        print('=> save_vocabulary time elapsed', time.time() - start_time2)
-        print('=> total time elapsed', time.time() - start_time)
+        if not CORPUS.docs:
+            print("Could not parse any valid docs")
+        else:
+            start_time2 = time.time()
+            CORPUS.build_and_gather_multiple_arrays(SAVE_DIR)
+            print('=> build_and_gather_multiple_arrays time elapsed', time.time() - start_time2)
+            start_time2 = time.time()
+            CORPUS.save_vocabulary(SAVE_DIR)
+            print('=> save_vocabulary time elapsed', time.time() - start_time2)
+            print('=> total time elapsed', time.time() - start_time)
     if args.function == 'key' or args.function == 'all':
         CORPUS.build_key_file(args.path, args.key)
     if args.function == 'find_undetected':

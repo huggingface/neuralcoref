@@ -14,10 +14,10 @@ import torch.utils.data
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset
 
-from neuralcoref.utils import (encode_distance, BATCH_SIZE_PATH, SIZE_FP,
+from neuralcoref.train.utils import (encode_distance, BATCH_SIZE_PATH, SIZE_FP,
                                SIZE_FP_COMPRESSED, SIZE_FS, SIZE_FS_COMPRESSED,
                                SIZE_GENRE, SIZE_PAIR_IN, SIZE_SINGLE_IN)
-from neuralcoref.conllparser import FEATURES_NAMES
+from neuralcoref.train.conllparser import FEATURES_NAMES
 
 def load_embeddings_from_file(name):
     print("loading", name+"_embeddings.npy")
@@ -95,8 +95,8 @@ class NCDataset(Dataset):
 
         """
         features_raw, label, pairs_length, pairs_start_index, spans, words = self.mentions[mention_idx]
-        pairs_start_index = np.asscalar(pairs_start_index)
-        pairs_length = np.asscalar(pairs_length)
+        pairs_start_index = pairs_start_index.item()
+        pairs_length = pairs_length.item()
 
         # Build features array (float) from raw features (int)
         assert features_raw.shape[0] == SIZE_FS_COMPRESSED
@@ -141,7 +141,7 @@ class NCDataset(Dataset):
         pairs_features[:, 17:28] = encode_distance(pairs_features_raw[:, 7])
         pairs_features[:, 28] = pairs_features_raw[:, 8]
         # prepare antecent features
-        ant_features_raw = np.concatenate([self.mentions[np.asscalar(idx)][0][np.newaxis, :] for idx in pairs_ant_index])
+        ant_features_raw = np.concatenate([self.mentions[idx.item()][0][np.newaxis, :] for idx in pairs_ant_index])
         ant_features = np.zeros((pairs_length, SIZE_FS-SIZE_GENRE))
         ant_features[:, ant_features_raw[:, 0]] = 1
         ant_features[:, 4:15] = encode_distance(ant_features_raw[:, 1])
@@ -152,8 +152,8 @@ class NCDataset(Dataset):
         ana_features = np.tile(features, (pairs_length, 1))
         pairs_features[:, 46:] = ana_features
 
-        ant_spans = np.concatenate([self.mentions[np.asscalar(idx)][4][np.newaxis, :] for idx in pairs_ant_index])
-        ant_words = np.concatenate([self.mentions[np.asscalar(idx)][5][np.newaxis, :] for idx in pairs_ant_index])
+        ant_spans = np.concatenate([self.mentions[idx.item()][4][np.newaxis, :] for idx in pairs_ant_index])
+        ant_words = np.concatenate([self.mentions[idx.item()][5][np.newaxis, :] for idx in pairs_ant_index])
         ana_spans = np.tile(spans, (pairs_length, 1))
         ana_words = np.tile(words, (pairs_length, 1))
         ant_spans = torch.from_numpy(ant_spans).float()
@@ -328,15 +328,15 @@ def padder_collate(batch, debug=False):
             # Remark this mask is the inverse of the weights in the above target (used for evaluation masking)
             t_base = transposed_inputs[3]
             out_targets = torch.stack(
-                    [torch.cat([t.new(len(t)-1).zero_().byte(),
-                                t.new(max_pairs + 1 - len(t)).fill_(1).byte(),
-                                t.new(1).zero_().byte()]) if len(t) != max_pairs + 1 \
-                        else t.new(max_pairs + 1).zero_().byte() for t in t_base], 0)
+                    [torch.cat([t.new(len(t)-1).zero_().bool(),
+                                t.new(max_pairs + 1 - len(t)).fill_(1).bool(),
+                                t.new(1).zero_().bool()]) if len(t) != max_pairs + 1 \
+                        else t.new(max_pairs + 1).zero_().bool() for t in t_base], 0)
     else:
         out_inputs = [torch.stack(t_inp, 0) for t_inp in transposed_inputs]
         if transposed_targets is not None:
             out_targets = [torch.stack(t_targ, 0) for t_targ in transposed_targets]
             out_targets.append(out_targets[1].new(len(out_targets[1]), 1).fill_(1))
         else:
-            out_targets = out_inputs[0].new(len(out_inputs[0]), 1).zero_().byte()
+            out_targets = out_inputs[0].new(len(out_inputs[0]), 1).zero_().bool()
     return (out_inputs, out_targets)

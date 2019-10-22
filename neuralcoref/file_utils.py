@@ -12,7 +12,6 @@ import shutil
 import tempfile
 from functools import wraps
 from hashlib import sha256
-import sys
 from io import open
 
 import boto3

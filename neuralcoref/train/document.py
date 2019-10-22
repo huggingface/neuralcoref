@@ -7,9 +7,10 @@ from __future__ import print_function
 import re
 import io
 from six import string_types, integer_types
+from spacy.tokens import Span, Token
 
-from neuralcoref.compat import unicode_
-from neuralcoref.utils import encode_distance, parallel_process
+from neuralcoref.train.compat import unicode_
+from neuralcoref.train.utils import encode_distance, parallel_process
 
 try:
     from itertools import izip_longest as zip_longest
@@ -39,7 +40,7 @@ MAX_ITER = 100
 ## MENTION EXTRACTION ###
 #########################
 
-def extract_mentions_spans(doc, blacklist=True, debug=False):
+def extract_mentions_spans(doc, blacklist, debug=False):
     '''
     Extract potential mentions from a spacy parsed Doc
     '''

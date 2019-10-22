@@ -18,11 +18,12 @@ from torch.optim import RMSprop
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
-from neuralcoref.model import Model
-from neuralcoref.dataset import (NCDataset, NCBatchSampler,
+from neuralcoref.train.model import Model
+from neuralcoref.train.dataset import (NCDataset, NCBatchSampler,
     load_embeddings_from_file, padder_collate,
-    SIZE_PAIR_IN, SIZE_SINGLE_IN, SIZE_EMBEDDING)
-from neuralcoref.evaluator import ConllEvaluator
+    SIZE_PAIR_IN, SIZE_SINGLE_IN)
+from neuralcoref.train.utils import SIZE_EMBEDDING
+from neuralcoref.train.evaluator import ConllEvaluator
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 STAGES = ["allpairs", "toppairs", "ranking"]
@@ -37,7 +38,7 @@ def get_all_pairs_loss(n):
         """
         labels = targets[0]
         weights = targets[4].data if len(targets) == 5 else None
-        loss_op = nn.BCEWithLogitsLoss(weight=weights, size_average=False)
+        loss_op = nn.BCEWithLogitsLoss(weight=weights, reduction='sum')
         loss = loss_op(scores, labels)
         return loss / n
     return all_pair_loss
@@ -270,8 +271,8 @@ def run_model(args):
 if __name__ == '__main__':
     DIR_PATH = os.path.dirname(os.path.realpath(__file__))
     parser = argparse.ArgumentParser(description='Training the neural coreference model')
-    parser.add_argument('--train', type=str, default=DIR_PATH + '/data/tiny/', help='Path to the train dataset')
-    parser.add_argument('--eval', type=str, default=DIR_PATH + '/data/tiny/', help='Path to the eval dataset')
+    parser.add_argument('--train', type=str, default=DIR_PATH + '/data/', help='Path to the train dataset')
+    parser.add_argument('--eval', type=str, default=DIR_PATH + '/data/', help='Path to the eval dataset')
     parser.add_argument('--evalkey', type=str, help='Path to an optional key file for scoring')
     parser.add_argument('--weights', type=str, help='Path to pre-trained weights (if you only want to test the scoring for e.g.)')
     parser.add_argument('--batchsize', type=int, default=20000, help='Size of a batch in total number of pairs')
@@ -298,7 +299,7 @@ if __name__ == '__main__':
     parser.add_argument('--all_pairs_l2', type=float, default=1e-6, help='all pairs pre-training l2 regularization')
     parser.add_argument('--top_pairs_l2', type=float, default=1e-5, help='top pairs pre-training l2 regularization')
     parser.add_argument('--ranking_l2', type=float, default=1e-5, help='ranking training l2 regularization')
-    parser.add_argument('--patience', type=int, default=3, help='patience (epochs) before considering evaluationhas decreased')
+    parser.add_argument('--patience', type=int, default=3, help='patience (epochs) before considering evaluation has decreased')
     parser.add_argument('--min_lr', type=float, default=2e-8, help='min learning rate')
     parser.add_argument('--on_eval_decrease', type=str, default='nothing',
                         help='What to do when evaluation decreases ("nothing", "divide_lr", "next_stage", "divide_then_next")')

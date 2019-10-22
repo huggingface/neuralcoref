@@ -31,11 +31,11 @@ class Model(nn.Module):
     def init_weights(self):
         w = (param.data for name, param in self.named_parameters() if 'weight' in name)
         b = (param.data for name, param in self.named_parameters() if 'bias' in name)
-        nn.init.uniform(self.word_embeds.weight.data, a=-0.5, b=0.5)
+        nn.init.uniform_(self.word_embeds.weight.data, a=-0.5, b=0.5)
         for t in w:
-            nn.init.xavier_uniform(t)
+            nn.init.xavier_uniform_(t)
         for t in b:
-            nn.init.constant(t, 0)
+            nn.init.constant_(t, 0)
 
     def load_embeddings(self, preloaded_weights):
         self.word_embeds.weight = nn.Parameter(preloaded_weights)
@@ -69,13 +69,16 @@ class Model(nn.Module):
             spans, words, single_features, ant_spans, ant_words, ana_spans, ana_words, pair_features = inputs
         else:
             spans, words, single_features = inputs
+        words = words.type(torch.LongTensor)
         embed_words = self.drop(self.word_embeds(words).view(words.size()[0], -1))
         single_input = torch.cat([spans, embed_words, single_features], 1)
         single_scores = self.single_top(single_input)
         if pairs:
             batchsize, pairs_num, _ = ana_spans.size()
-            ant_embed_words = self.drop(self.word_embeds(ant_words.view(batchsize, -1)).view(batchsize, pairs_num, -1))
-            ana_embed_words = self.drop(self.word_embeds(ana_words.view(batchsize, -1)).view(batchsize, pairs_num, -1))
+            ant_words_long = ant_words.view(batchsize, -1).type(torch.LongTensor)
+            ana_words_long = ana_words.view(batchsize, -1).type(torch.LongTensor)
+            ant_embed_words = self.drop(self.word_embeds(ant_words_long).view(batchsize, pairs_num, -1))
+            ana_embed_words = self.drop(self.word_embeds(ana_words_long).view(batchsize, pairs_num, -1))
             pair_input = torch.cat([ant_spans, ant_embed_words, ana_spans, ana_embed_words, pair_features], 2)
             pair_scores = self.pair_top(pair_input).squeeze(dim=2)
             total_scores = torch.cat([pair_scores, single_scores], concat_axis)
