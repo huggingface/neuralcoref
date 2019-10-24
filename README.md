@@ -169,7 +169,7 @@ A `Cluster` is a cluster of coreferring mentions which has 3 attributes and a fe
 |`__iter__`              |yields `Span`        |Iterate over mentions in the cluster
 |`__len__`               |return int           |Number of mentions in the cluster
 
-### Naviguating the coreference cluster chains
+### Navigating the coreference cluster chains
 
 You can also easily navigate the coreference cluster chains and display clusters and mentions.
 
