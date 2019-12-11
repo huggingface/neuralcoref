@@ -22,7 +22,7 @@ First, download the [OntoNotes 5.0 dataset](https://catalog.ldc.upenn.edu/LDC201
 Then, download the [CoNLL-2012 skeleton files](http://conll.cemantix.org/2012/data.html) from the CoNLL 2012 shared task site, 
 and combine these skeleton files with the OntoNotes files to get the `*._conll` text files which can be used as inputs for the training.
 
-This can be done by executing the script [compile_coref_data.sh](/neuralcoref/train/conll_processing_scripts/compile_coref_data.sh)
+This can be done by executing the script [compile_coref_data.sh](/neuralcoref/train/conll_processing_script/compile_coref_data.sh)
 or by following these steps:
 * From the [CoNLL 2012 download site](http://conll.cemantix.org/2012/download/), download and extract:
    * http://conll.cemantix.org/2012/download/conll-2012-train.v4.tar.gz
