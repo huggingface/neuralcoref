@@ -45,13 +45,13 @@ or by following these steps:
    * `cat conll-2012/v4/data/test/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> test.my_lang.v4_gold_conll`
 
 ## Prepare the data
-Once you have the set of `*.v4_gold_conll` files, move these files into seperate (`train`, `test`, `dev`) subdirectories inside `data` directory. Now, you can prepare the training data by running 
+Once you have the set of `*.v4_gold_conll` files, move these files into separate (`train`, `test`, `dev`) subdirectories inside a new directory. You can use the already present `data` directory or create another directory anywhere you want. Now, you can prepare the training data by running 
 [conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (`train`, `test`, `dev`) as
 
 ````bash
-python -m neuralcoref.train.conllparser --path ./data/train/
-python -m neuralcoref.train.conllparser --path ./data/test/
-python -m neuralcoref.train.conllparser --path ./data/dev/
+python -m neuralcoref.train.conllparser --path ./$path_to_data_directory/train/
+python -m neuralcoref.train.conllparser --path ./$path_to_data_directory/test/
+python -m neuralcoref.train.conllparser --path ./$path_to_data_directory/dev/
 ````
 
 Conllparser will:
