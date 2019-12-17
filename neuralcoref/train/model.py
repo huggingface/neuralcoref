@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 import torch.utils.data
 
+
 class Model(nn.Module):
     def __init__(self, vocab_size, embedding_dim, H1, H2, H3, D_pair_in, D_single_in, dropout=0.5):
         super(Model, self).__init__()
@@ -70,6 +71,8 @@ class Model(nn.Module):
         else:
             spans, words, single_features = inputs
         words = words.type(torch.LongTensor)
+        if self.cuda:
+            words = words.cuda()
         embed_words = self.drop(self.word_embeds(words).view(words.size()[0], -1))
         single_input = torch.cat([spans, embed_words, single_features], 1)
         single_scores = self.single_top(single_input)
@@ -77,6 +80,9 @@ class Model(nn.Module):
             batchsize, pairs_num, _ = ana_spans.size()
             ant_words_long = ant_words.view(batchsize, -1).type(torch.LongTensor)
             ana_words_long = ana_words.view(batchsize, -1).type(torch.LongTensor)
+            if self.cuda:
+                ant_words_long = ant_words_long.cuda()
+                ana_words_long = ana_words_long.cuda()
             ant_embed_words = self.drop(self.word_embeds(ant_words_long).view(batchsize, pairs_num, -1))
             ana_embed_words = self.drop(self.word_embeds(ana_words_long).view(batchsize, pairs_num, -1))
             pair_input = torch.cat([ant_spans, ant_embed_words, ana_spans, ana_embed_words, pair_features], 2)
