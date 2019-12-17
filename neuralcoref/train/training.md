@@ -14,12 +14,12 @@ python -m spacy download en
 ````
 
 ## Get the data
-The following assumes you want to train on English, Arabic or Chinese. 
+The following assumes you want to train on English, Arabic or Chinese.
 If you want to train on another language, see the section [train on a new language](#train-on-a-new-language) below.
 
 First, download the [OntoNotes 5.0 dataset](https://catalog.ldc.upenn.edu/LDC2013T19) from LDC.
 
-Then, download the [CoNLL-2012 skeleton files](http://conll.cemantix.org/2012/data.html) from the CoNLL 2012 shared task site, 
+Then, download the [CoNLL-2012 skeleton files](http://conll.cemantix.org/2012/data.html) from the CoNLL 2012 shared task site,
 and combine these skeleton files with the OntoNotes files to get the `*._conll` text files which can be used as inputs for the training.
 
 This can be done by executing the script [compile_coref_data.sh](/neuralcoref/train/conll_processing_script/compile_coref_data.sh)
@@ -43,15 +43,15 @@ or by following these steps:
    * `cat conll-2012/v4/data/train/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> train.my_lang.v4_gold_conll`
    * `cat conll-2012/v4/data/development/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> dev.my_lang.v4_gold_conll`
    * `cat conll-2012/v4/data/test/data/my_lang/annotations/*/*/*/*.v4_gold_conll >> test.my_lang.v4_gold_conll`
-   
+
 ## Prepare the data
-Once you have the set of `*.v4_gold_conll` files, you can prepare the training data by running 
+Once you have the set of `*.v4_gold_conll` files, move these files into separate (`train`, `test`, `dev`) subdirectories inside a new directory. You can use the already present `data` directory or create another directory anywhere you want. Now, you can prepare the training data by running 
 [conllparser.py](/neuralcoref/train/conllparser.py) on each split of the data set (`train`, `test`, `dev`) as
 
 ````bash
-python -m neuralcoref.train.conllparser --path ./data/train/
-python -m neuralcoref.train.conllparser --path ./data/test/
-python -m neuralcoref.train.conllparser --path ./data/dev/
+python -m neuralcoref.train.conllparser --path ./$path_to_data_directory/train/
+python -m neuralcoref.train.conllparser --path ./$path_to_data_directory/test/
+python -m neuralcoref.train.conllparser --path ./$path_to_data_directory/dev/
 ````
 
 Conllparser will:
@@ -61,8 +61,8 @@ Conllparser will:
 - gather the mention features in a set of numpy arrays to be used as input for the neural net model.
 
 ## Train the model
-Once the files have been pre-processed 
-(you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (`train`|`test`|`dev`) data folder), 
+Once the files have been pre-processed
+(you should have a set of `*.npy` files in a sub-directory `/numpy` in each of your (`train`|`test`|`dev`) data folder),
 you can start the training process using [learn.py](/neuralcoref/train/learn.py), for example as
 ````bash
 python -m neuralcoref.train.learn --train ./data/train/ --eval ./data/dev/
@@ -73,13 +73,13 @@ There many parameters and options for the training. You can list them with the u
 python -m neuralcoref.train.learn --help
 ````
 
-You can follow the training by running [Tensorboard for pyTorch](https://github.com/lanpa/tensorboard-pytorch) 
+You can follow the training by running [Tensorboard for pyTorch](https://github.com/lanpa/tensorboard-pytorch)
 (it requires a version of Tensorflow, any version will be fine). Run it with `tensorboard --logdir runs`.
 
 ## Some details on the training
-The model and the training as thoroughfully described in our 
-[very detailed blog post](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe). 
-The training process is similar to the mention-ranking training described in 
+The model and the training as thoroughfully described in our
+[very detailed blog post](https://medium.com/huggingface/how-to-train-a-neural-coreference-model-neuralcoref-2-7bb30c1abdfe).
+The training process is similar to the mention-ranking training described in
 [Clark and Manning (2016)](http://cs.stanford.edu/people/kevclark/resources/clark-manning-emnlp2016-deep.pdf), namely:
 - A first step of training uses a standard cross entropy loss on the mention pair labels,
 - A second step of training uses a cross entropy loss on the top pairs only, and
