@@ -119,13 +119,13 @@ def load_file(full_name, debug=False):
     load a *._conll file
     Input: full_name: path to the file
     Output: list of tuples for each conll doc in the file, where the tuple contains:
-        (utts_text ([str]): list of the utterances in the document 
-         utts_tokens ([[str]]): list of the tokens (conll words) in the document 
+        (utts_text ([str]): list of the utterances in the document
+         utts_tokens ([[str]]): list of the tokens (conll words) in the document
          utts_corefs: list of coref objects (dicts) with the following properties:
             coref['label']: id of the coreference cluster,
             coref['start']: start index (index of first token in the utterance),
             coref['end': end index (index of last token in the utterance).
-         utts_speakers ([str]): list of the speaker associated to each utterances in the document 
+         utts_speakers ([str]): list of the speaker associated to each utterances in the document
          name (str): name of the document
          part (str): part of the document
         )
@@ -377,11 +377,11 @@ class ConllDoc(Document):
             mentions_features: (N, Fs)
             mentions_labels: (N, 1)
             mentions_pairs_start_index: (N, 1) index of beggining of pair list in pair_labels
-            mentions_pairs_length: (N, 1) number of pairs (i.e. nb of antecedents) for each mention 
+            mentions_pairs_length: (N, 1) number of pairs (i.e. nb of antecedents) for each mention
             pairs_features: (P, Fp)
             pairs_labels: (P, 1)
             pairs_ant_idx: (P, 1) => indexes of antecedents mention for each pair (mention index in doc)
-        """ 
+        """
         if not self.mentions:
             if debug: print("No mention in this doc !")
             return {}
@@ -552,7 +552,7 @@ class ConllCorpus(object):
                     out_file.write(out_str)
                     if debug: print(out_str)
 
-    def read_corpus(self, data_path, debug=False):
+    def read_corpus(self, data_path, model=None, debug=False):
         print("🌋 Reading files")
         for dirpath, _, filenames in os.walk(data_path):
             print("In", dirpath, os.path.abspath(dirpath))
@@ -595,20 +595,24 @@ class ConllCorpus(object):
                                       embedding_extractor=self.embed_extractor,
                                       conll=CONLL_GENRES[name[:2]]))
         print("🌋 Loading spacy model")
-        model_options = ['en_core_web_lg', 'en_core_web_md', 'en_core_web_sm', 'en']
-        model = None
-        for model_option in model_options:
-            if not model:
-                try:
-                    spacy.info(model_option)
-                    model = model_option
-                    print("Loaded model", model_option)
-                except:
-                    print("Could not detect model", model_option)
-        if not model:
-            print("Could not detect any suitable English model")
-            return
 
+        if model is None:
+            model_options = ['en_core_web_lg', 'en_core_web_md', 'en_core_web_sm', 'en']
+            model = None  # this declaration is redundant
+            for model_option in model_options:
+                if not model:
+                    try:
+                        spacy.info(model_option)
+                        model = model_option
+                        print("Loading model", model_option)
+                    except:
+                        print("Could not detect model", model_option)
+            if not model:
+                print("Could not detect any suitable English model")
+                return
+        else:
+            spacy.info(model)
+            print("Loading model", model)
         nlp = spacy.load(model)
         print("🌋 Parsing utterances and filling docs with use_gold_mentions=" + (str(bool(self.gold_mentions))))
         doc_iter = (s for s in self.utts_text)
@@ -618,7 +622,7 @@ class ConllCorpus(object):
             spacy_tokens, conll_tokens, corefs, speaker, doc_id = utt_tuple
             if debug: print(unicode_(self.docs_names[doc_id]), "-", spacy_tokens)
             doc = spacy_tokens
-            if debug: 
+            if debug:
                 out_str = "utterance " + unicode_(doc) + " corefs " + unicode_(corefs) + \
                           " speaker " + unicode_(speaker) + "doc_id" + unicode_(doc_id)
                 print(out_str.encode('utf-8'))
@@ -722,6 +726,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_jobs', type=int, default=1, help='Number of parallel jobs (default 1)')
     parser.add_argument('--gold_mentions', type=int, default=0, help='Use gold mentions (1) or not (0, default)')
     parser.add_argument('--blacklist', type=int, default=0, help='Use blacklist (1) or not (0, default)')
+    parser.add_argument('--spacy_model', type=str, default=None, help='spacys language model')
     args = parser.parse_args()
     if args.key is None:
         args.key = args.path + "/key.txt"
@@ -738,7 +743,7 @@ if __name__ == '__main__':
                     print(file)
                     os.remove(SAVE_DIR + file)
         start_time = time.time()
-        CORPUS.read_corpus(args.path)
+        CORPUS.read_corpus(args.path, model=args.spacy_model)
         print('=> read_corpus time elapsed', time.time() - start_time)
         if not CORPUS.docs:
             print("Could not parse any valid docs")
