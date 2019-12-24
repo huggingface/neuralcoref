@@ -28,6 +28,32 @@ def load_embeddings_from_file(name):
         voc = [line.strip() for line in f]
     return embed, voc
 
+
+class _DictionaryDataLoader(object):
+    def __init__(self, dict_object, order):
+        self.dict_object = dict_object
+        self.order = order
+
+    def __len__(self):
+        return len(self.dict_object[self.order[0]])
+
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            data = []
+            for i in range(idx.start, idx.stop, idx.step if idx.step is not None else 1):
+                temp_data = []
+                for key in self.order:
+                    temp_data.append(self.dict_object[key][i])
+                data.append(temp_data)
+
+        else:
+            data = []
+            for key in self.order:
+                data.append(self.dict_object[key][idx])
+
+        return data
+
+
 class NCDataset(Dataset):
     def __init__(self, data_path, params, no_targets=False):
         print("🏝 Loading Dataset at", data_path)
@@ -44,13 +70,18 @@ class NCDataset(Dataset):
                 continue
             numpy_files_found = True
             print(file_name, end=', ')
-            datas[file_name.split(u'.')[0]] = np.load(data_path + file_name)
+            datas[file_name.split(u'.')[0]] = np.load(data_path + file_name, mmap_mode="r" if params.lazy else None)
         if not numpy_files_found:
             raise ValueError("Can't find numpy files in {}".format(data_path))
 
         # Gather arrays in two lists of tuples for mention and pairs
-        self.mentions = list(zip(*(arr for key, arr in sorted(datas.items()) if key.startswith(u"mentions"))))
-        self.pairs = list(zip(*(arr for key, arr in sorted(datas.items()) if key.startswith(u"pairs"))))
+        if not params.lazy:
+            self.mentions = list(zip(*(arr for key, arr in sorted(datas.items()) if key.startswith(u"mentions"))))
+            self.pairs = list(zip(*(arr for key, arr in sorted(datas.items()) if key.startswith(u"pairs"))))
+        else:
+            self.mentions = _DictionaryDataLoader(datas, order=('mentions_features', 'mentions_labels', 'mentions_pairs_length', 'mentions_pairs_start_index', 'mentions_spans', 'mentions_words'))
+            self.pairs = _DictionaryDataLoader(datas, order=('pairs_ant_index', 'pairs_features', 'pairs_labels'))
+
         self.mentions_pair_length = datas[FEATURES_NAMES[2]]
         assert [arr.shape[0] for arr in self.mentions[0]] == [6, 1, 1, 1, 250, 8] # Cf order of FEATURES_NAMES in conllparser.py
         assert [arr.shape[0] for arr in self.pairs[0]] == [1, 9, 1] # Cf order of FEATURES_NAMES in conllparser.py
@@ -148,7 +179,7 @@ class NCDataset(Dataset):
         ant_features[:, 15] = ant_features_raw[:, 2].astype(float) / ant_features_raw[:, 3].astype(float)
         ant_features[:, 16] = ant_features_raw[:, 4]
         pairs_features[:, 29:46] = ant_features
-        # Here we keep the genre 
+        # Here we keep the genre
         ana_features = np.tile(features, (pairs_length, 1))
         pairs_features[:, 46:] = ana_features
 
@@ -213,7 +244,7 @@ class NCBatchSampler(Sampler):
                  shuffle=False, debug=False):
         """ Create and feed batches of mentions having close number of antecedents
             The batch are padded and collated by the padder_collate function
-        
+
         # Arguments:
             mentions_pairs_length array of shape (N, 1): list/array of the number of pairs for each mention
             batchsize: Number of pairs of each batch will be capped at this
@@ -232,7 +263,7 @@ class NCBatchSampler(Sampler):
         num = 0
         for length, mention_idx in sorted_lengths:
             if num > batchsize or (num == len(batch) and length != 0): # We keep the no_pairs batches pure
-                if debug: print("Added batch number", len(self.batches), 
+                if debug: print("Added batch number", len(self.batches),
                                 "with", len(batch), "mentions and", num, "pairs")
                 self.batches.append(batch)
                 self.batches_size.append(num) # We don't count the max 7 additional mentions that are repeated
@@ -281,7 +312,7 @@ class NCBatchSampler(Sampler):
 
 def padder_collate(batch, debug=False):
     """ Puts each data field into a tensor with outer dimension batch size
-        Pad variable length input tensors and add a weight tensor to the target 
+        Pad variable length input tensors and add a weight tensor to the target
     """
     transposed_inputs = tuple(zip(*batch))
     if len(transposed_inputs) == 2:
