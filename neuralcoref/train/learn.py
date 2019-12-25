@@ -303,10 +303,10 @@ if __name__ == '__main__':
     parser.add_argument('--min_lr', type=float, default=2e-8, help='min learning rate')
     parser.add_argument('--on_eval_decrease', type=str, default='nothing',
                         help='What to do when evaluation decreases ("nothing", "divide_lr", "next_stage", "divide_then_next")')
+    parser.add_argument('--lazy', type=int, default=1, choices=(0, 1), help='Use lazy loading (1, default) or not (0) while loading the npy files')
     args = parser.parse_args()
-
     args.costs = {'FN': args.costfn, 'FL': args.costfl, 'WL' : args.costwl }
-
+    args.lazy = bool(args.lazy)
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
     args.save_path = os.path.join(PACKAGE_DIRECTORY, 'checkpoints', current_time + '_' + socket.gethostname() + '_')
 
