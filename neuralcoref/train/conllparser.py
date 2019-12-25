@@ -598,7 +598,6 @@ class ConllCorpus(object):
 
         if model is None:
             model_options = ['en_core_web_lg', 'en_core_web_md', 'en_core_web_sm', 'en']
-            model = None  # this declaration is redundant
             for model_option in model_options:
                 if not model:
                     try:
@@ -726,7 +725,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_jobs', type=int, default=1, help='Number of parallel jobs (default 1)')
     parser.add_argument('--gold_mentions', type=int, default=0, help='Use gold mentions (1) or not (0, default)')
     parser.add_argument('--blacklist', type=int, default=0, help='Use blacklist (1) or not (0, default)')
-    parser.add_argument('--spacy_model', type=str, default=None, help='spacys language model')
+    parser.add_argument('--spacy_model', type=str, default=None, help='model name')
     args = parser.parse_args()
     if args.key is None:
         args.key = args.path + "/key.txt"
