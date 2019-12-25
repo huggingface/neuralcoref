@@ -307,7 +307,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.costs = {'FN': args.costfn, 'FL': args.costfl, 'WL' : args.costwl }
     args.lazy = bool(args.lazy)
-    print(args.lazy)
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
     args.save_path = os.path.join(PACKAGE_DIRECTORY, 'checkpoints', current_time + '_' + socket.gethostname() + '_')
 
