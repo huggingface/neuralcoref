@@ -27,7 +27,7 @@ if os.path.exists(NEURALCOREF_MODEL_PATH) and os.path.exists(
     local_model = cached_path(NEURALCOREF_MODEL_PATH)
 else:
     if not os.path.exists(NEURALCOREF_MODEL_PATH):
-        os.makedirs(NEURALCOREF_MODEL_PATH)
+        os.makedirs(NEURALCOREF_MODEL_PATH, exist_ok=True)
     logger.info(f"Getting model from {NEURALCOREF_MODEL_URL} or cache")
     downloaded_model = cached_path(NEURALCOREF_MODEL_URL)
 
