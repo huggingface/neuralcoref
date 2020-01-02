@@ -15,7 +15,7 @@ unicode_ = str
 
 class AllResource(object):
     def __init__(self):
-        self.nlp = spacy.load('en')
+        self.nlp = spacy.load("en")
         neuralcoref.add_to_pipe(self.nlp)
         print("Server loaded")
         self.response = None
@@ -30,28 +30,34 @@ class AllResource(object):
             text = unicode_(text)
             doc = self.nlp(text)
             if doc._.has_coref:
-                mentions = [{'start':    mention.start_char,
-                             'end':      mention.end_char,
-                             'text':     mention.text,
-                             'resolved': cluster.main.text
-                            }
-                            for cluster in doc._.coref_clusters
-                            for mention in cluster.mentions]
-                clusters = list(list(span.text for span in cluster)
-                                for cluster in doc._.coref_clusters)
+                mentions = [
+                    {
+                        "start": mention.start_char,
+                        "end": mention.end_char,
+                        "text": mention.text,
+                        "resolved": cluster.main.text,
+                    }
+                    for cluster in doc._.coref_clusters
+                    for mention in cluster.mentions
+                ]
+                clusters = list(
+                    list(span.text for span in cluster)
+                    for cluster in doc._.coref_clusters
+                )
                 resolved = doc._.coref_resolved
-                self.response['mentions'] = mentions
-                self.response['clusters'] = clusters
-                self.response['resolved'] = resolved
+                self.response["mentions"] = mentions
+                self.response["clusters"] = clusters
+                self.response["resolved"] = resolved
 
         resp.body = json.dumps(self.response)
-        resp.content_type = 'application/json'
-        resp.append_header('Access-Control-Allow-Origin', "*")
+        resp.content_type = "application/json"
+        resp.append_header("Access-Control-Allow-Origin", "*")
         resp.status = falcon.HTTP_200
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     RESSOURCE = AllResource()
     APP = falcon.API()
-    APP.add_route('/', RESSOURCE)
-    HTTPD = make_server('0.0.0.0', 8000, APP)
+    APP.add_route("/", RESSOURCE)
+    HTTPD = make_server("0.0.0.0", 8000, APP)
     HTTPD.serve_forever()
