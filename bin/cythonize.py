@@ -25,7 +25,6 @@ https://raw.githubusercontent.com/numpy/numpy/master/tools/cythonize.py
 
 Note: this script does not check any of the dependent C++ libraries.
 """
-from __future__ import print_function
 
 import os
 import sys

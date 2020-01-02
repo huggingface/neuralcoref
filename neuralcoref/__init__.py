@@ -1,10 +1,5 @@
-# coding: utf8
-from __future__ import unicode_literals, absolute_import
-
 import os
-import shutil
 import tarfile
-import tempfile
 import logging
 
 # Filter Cython warnings that would force everybody to re-compile from source (like https://github.com/numpy/numpy/pull/432).

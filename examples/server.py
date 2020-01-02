@@ -1,10 +1,7 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """Coreference resolution server example.
 A simple server serving the coreference system.
 """
-from __future__ import unicode_literals
-from __future__ import print_function
 
 import json
 from wsgiref.simple_server import make_server

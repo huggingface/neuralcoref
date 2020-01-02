@@ -1,8 +1,4 @@
-# coding: utf8
 """data models and pre-processing for the coref algorithm"""
-
-from __future__ import unicode_literals
-from __future__ import print_function
 
 import re
 import io

@@ -1,12 +1,9 @@
-# coding: utf8
 # cython: infer_types=True, boundscheck=False
 # distutils: language=c++
 """ NeuralCoref resolution spaCy v2.0 pipeline component 
 Custom pipeline components: https://spacy.io//usage/processing-pipelines#custom-components
 Compatible with: spaCy v2.0.0+
 """
-from __future__ import unicode_literals, print_function
-# from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
 
 import plac
 import re

@@ -1,10 +1,6 @@
-# coding: utf8
 # cython: profile=True
 # cython: infer_types=True
 """Coref resolution"""
-
-from __future__ import unicode_literals
-from __future__ import print_function
 
 import os
 import spacy
