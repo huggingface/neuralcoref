@@ -12,10 +12,8 @@ import falcon
 import spacy
 import neuralcoref
 
-try:
-    unicode_ = unicode  # Python 2
-except NameError:
-    unicode_ = str      # Python 3
+# Python 3
+unicode_ = str
 
 
 class AllResource(object):
