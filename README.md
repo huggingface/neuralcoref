@@ -15,7 +15,7 @@ NeuralCoref is accompanied by a visualization client [NeuralCoref-Viz](https://g
 [![NeuralCoref online Demo](https://huggingface.co/coref/assets/thumbnail-large.png)](https://huggingface.co/coref/)
 
 - **Operating system**: macOS / OS X · Linux · Windows (Cygwin, MinGW, Visual Studio)
-- **Python version**: Python 3.5+ (only 64 bit)
+- **Python version**: Python 3.6+ (only 64 bit)
 - **Package managers**: [pip]
 
 ## Install NeuralCoref
@@ -169,7 +169,7 @@ A `Cluster` is a cluster of coreferring mentions which has 3 attributes and a fe
 |`__iter__`              |yields `Span`        |Iterate over mentions in the cluster
 |`__len__`               |return int           |Number of mentions in the cluster
 
-### Naviguating the coreference cluster chains
+### Navigating the coreference cluster chains
 
 You can also easily navigate the coreference cluster chains and display clusters and mentions.
 

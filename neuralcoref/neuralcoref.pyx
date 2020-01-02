@@ -1,12 +1,9 @@
-# coding: utf8
 # cython: infer_types=True, boundscheck=False
 # distutils: language=c++
 """ NeuralCoref resolution spaCy v2.0 pipeline component 
 Custom pipeline components: https://spacy.io//usage/processing-pipelines#custom-components
 Compatible with: spaCy v2.0.0+
 """
-from __future__ import unicode_literals, print_function
-# from posix.time cimport clock_gettime, timespec, CLOCK_REALTIME
 
 import plac
 import re
@@ -162,9 +159,9 @@ cdef HashesList get_hash_lookups(StringStore store, Pool mem):
     hashes.NSUBJ_MARK = store.add("nsubj")
     hashes.IN_TAG = store.add('IN')
     hashes.MARK_DEP = store.add("mark")
-    hashes.unknown_word = store.add(u"*UNK*")
-    hashes.missing_word = store.add(u"<missing>")
-    hashes.digit_word = store.add(u"0")
+    hashes.unknown_word = store.add("*UNK*")
+    hashes.missing_word = store.add("<missing>")
+    hashes.digit_word = store.add("0")
     return hashes
 
 cdef inline bint inside(hash_t element, Hashes hashes) nogil:
