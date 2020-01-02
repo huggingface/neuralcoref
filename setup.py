@@ -34,8 +34,6 @@ To create the package for pypi.
 7. Copy the release notes from RELEASE.md to the tag in github once everything is looking hunky-dory.
 
 """
-from __future__ import print_function
-import io
 import os
 import subprocess
 import sys
@@ -217,13 +215,9 @@ def setup_package():
                 "Operating System :: MacOS :: MacOS X",
                 "Operating System :: Microsoft :: Windows",
                 "Programming Language :: Cython",
-                "Programming Language :: Python :: 2",
-                "Programming Language :: Python :: 2.7",
-                "Programming Language :: Python :: 3",
-                "Programming Language :: Python :: 3.4",
-                "Programming Language :: Python :: 3.5",
                 "Programming Language :: Python :: 3.6",
                 "Programming Language :: Python :: 3.7",
+                "Programming Language :: Python :: 3.8",
                 "Topic :: Scientific/Engineering",
             ],
             install_requires=[
@@ -232,7 +226,7 @@ def setup_package():
                 "requests>=2.13.0,<3.0.0",
                 "spacy>=2.1.0"],
             setup_requires=['wheel', 'spacy>=2.1.0'],
-            python_requires=">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*",
+            python_requires=">=3.6",
             packages=PACKAGES,
             package_data=PACKAGE_DATA,
             keywords='NLP chatbots coreference resolution',
