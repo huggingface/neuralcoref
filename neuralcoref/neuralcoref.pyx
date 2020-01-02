@@ -159,9 +159,9 @@ cdef HashesList get_hash_lookups(StringStore store, Pool mem):
     hashes.NSUBJ_MARK = store.add("nsubj")
     hashes.IN_TAG = store.add('IN')
     hashes.MARK_DEP = store.add("mark")
-    hashes.unknown_word = store.add(u"*UNK*")
-    hashes.missing_word = store.add(u"<missing>")
-    hashes.digit_word = store.add(u"0")
+    hashes.unknown_word = store.add("*UNK*")
+    hashes.missing_word = store.add("<missing>")
+    hashes.digit_word = store.add("0")
     return hashes
 
 cdef inline bint inside(hash_t element, Hashes hashes) nogil:
