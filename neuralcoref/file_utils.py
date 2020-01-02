@@ -63,11 +63,11 @@ def filename_to_url(filename, cache_dir=None):
 
     cache_path = os.path.join(cache_dir, filename)
     if not os.path.exists(cache_path):
-        raise EnvironmentError("file {} not found".format(cache_path))
+        raise EnvironmentError(f"file {cache_path} not found")
 
     meta_path = cache_path + ".json"
     if not os.path.exists(meta_path):
-        raise EnvironmentError("file {} not found".format(meta_path))
+        raise EnvironmentError(f"file {meta_path} not found")
 
     with open(meta_path, encoding="utf-8") as meta_file:
         metadata = json.load(meta_file)
@@ -97,11 +97,11 @@ def cached_path(url_or_filename, cache_dir=None):
         return url_or_filename
     elif parsed.scheme == "":
         # File, but it doesn't exist.
-        raise EnvironmentError("file {} not found".format(url_or_filename))
+        raise EnvironmentError(f"file {url_or_filename} not found")
     else:
         # Something unknown
         raise ValueError(
-            "unable to parse {} as a URL or as a local path".format(url_or_filename)
+            f"unable to parse {url_or_filename} as a URL or as a local path"
         )
 
 
@@ -109,7 +109,7 @@ def split_s3_path(url):
     """Split a full s3 path into the bucket name and path."""
     parsed = urlparse(url)
     if not parsed.netloc or not parsed.path:
-        raise ValueError("bad s3 path {}".format(url))
+        raise ValueError(f"bad s3 path {url}")
     bucket_name = parsed.netloc
     s3_path = parsed.path
     # Remove '/' at beginning of path.
@@ -130,7 +130,7 @@ def s3_request(func):
             return func(url, *args, **kwargs)
         except ClientError as exc:
             if int(exc.response["Error"]["Code"]) == 404:
-                raise EnvironmentError("file {} not found".format(url))
+                raise EnvironmentError(f"file {url} not found")
             else:
                 raise
 
@@ -184,9 +184,7 @@ def get_from_cache(url, cache_dir=None):
         response = requests.head(url, allow_redirects=True)
         if response.status_code != 200:
             raise IOError(
-                "HEAD request failed for url {} with status code {}".format(
-                    url, response.status_code
-                )
+                f"HEAD request failed for url {url} with status code {response.status_code}"
             )
         etag = response.headers.get("ETag")
 

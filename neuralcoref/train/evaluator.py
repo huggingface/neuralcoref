@@ -57,9 +57,9 @@ class ConllEvaluator(object):
             bin_files_found = True
             print(file_name, end=", ")
             with open(test_data_path + file_name, "rb") as f:
-                datas[file_name.split(u".")[0]] = pickle.load(f)
+                datas[file_name.split(".")[0]] = pickle.load(f)
         if not bin_files_found:
-            raise ValueError("Can't find bin files in {}".format(test_data_path))
+            raise ValueError(f"Can't find bin files in {test_data_path}")
         print("Done")
         self.m_loc = datas[FEATURES_NAMES[9]]
         self.tokens = datas[FEATURES_NAMES[10]]
@@ -228,11 +228,11 @@ class ConllEvaluator(object):
             self.docs, self.tokens, self.lookup, self.m_loc, self.mention_to_cluster
         ):
             out_str += (
-                u"#begin document (" + doc["name"] + u"); part " + doc["part"] + u"\n"
+                "#begin document (" + doc["name"] + "); part " + doc["part"] + "\n"
             )
             for utt_idx, (c_tokens, c_lookup) in enumerate(zip(d_tokens, d_lookup)):
                 for i, (token, lookup) in enumerate(zip(c_tokens, c_lookup)):
-                    out_coref = u""
+                    out_coref = ""
                     for m_str, mention, mention_cluster in zip(
                         doc["mentions"], d_m_loc, d_m_to_c
                     ):
@@ -241,29 +241,29 @@ class ConllEvaluator(object):
                             pass
                         elif m_utt == utt_idx:
                             if m_start in lookup:
-                                out_coref += u"|" if out_coref else u""
-                                out_coref += u"(" + unicode_(mention_cluster)
+                                out_coref += "|" if out_coref else ""
+                                out_coref += "(" + unicode_(mention_cluster)
                                 if (m_end - 1) in lookup:
-                                    out_coref += u")"
+                                    out_coref += ")"
                                 else:
-                                    out_coref += u""
+                                    out_coref += ""
                             elif (m_end - 1) in lookup:
-                                out_coref += u"|" if out_coref else u""
-                                out_coref += unicode_(mention_cluster) + u")"
+                                out_coref += "|" if out_coref else ""
+                                out_coref += unicode_(mention_cluster) + ")"
                     out_line = (
                         doc["name"]
-                        + u" "
+                        + " "
                         + doc["part"]
-                        + u" "
+                        + " "
                         + unicode_(i)
-                        + u" "
+                        + " "
                         + token
-                        + u" "
+                        + " "
                     )
-                    out_line += u"-" if len(out_coref) == 0 else out_coref
-                    out_str += out_line + u"\n"
-                out_str += u"\n"
-            out_str += u"#end document\n"
+                    out_line += "-" if len(out_coref) == 0 else out_coref
+                    out_str += out_line + "\n"
+                out_str += "\n"
+            out_str += "#end document\n"
 
         # Write test file
         print("Writing in", out_path)
@@ -298,12 +298,12 @@ class ConllEvaluator(object):
                 raise
             if debug:
                 print("scorer_out", scorer_out)
-            value, ident = scorer_out.split(u"\n")[-2], scorer_out.split(u"\n")[-1]
+            value, ident = scorer_out.split("\n")[-2], scorer_out.split("\n")[-1]
             if debug:
                 print("value", value, "identification", ident)
-            NR, DR, NP, DP = [float(x) for x in value.split(u" ")]
+            NR, DR, NP, DP = [float(x) for x in value.split(" ")]
             ident_NR, ident_DR, ident_NP, ident_DP = [
-                float(x) for x in ident.split(u" ")
+                float(x) for x in ident.split(" ")
             ]
             precision = NP / DP if DP else 0
             recall = NR / DR if DR else 0

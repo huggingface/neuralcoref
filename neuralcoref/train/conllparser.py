@@ -70,7 +70,7 @@ def clean_token(token):
         cleaned_token = NORMALIZE_DICT[cleaned_token]
     if cleaned_token not in REMOVED_CHAR:
         for char in REMOVED_CHAR:
-            cleaned_token = cleaned_token.replace(char, u"")
+            cleaned_token = cleaned_token.replace(char, "")
     if len(cleaned_token) == 0:
         cleaned_token = ","
     return cleaned_token
@@ -172,7 +172,7 @@ def load_file(full_name, debug=False):
                 if tokens:
                     if debug:
                         print("End of utterance")
-                    utts_text.append(u"".join(t + u" " for t in tokens))
+                    utts_text.append("".join(t + " " for t in tokens))
                     utts_tokens.append(tokens)
                     utts_speakers.append(speaker)
                     utts_corefs.append(corefs)
@@ -228,8 +228,8 @@ def load_file(full_name, debug=False):
                     speaker = cols[9]
                     if debug:
                         print("speaker", speaker)
-                if cols[-1] != u"-":
-                    coref_expr = cols[-1].split(u"|")
+                if cols[-1] != "-":
+                    coref_expr = cols[-1].split("|")
                     if debug:
                         print("coref_expr", coref_expr)
                     if not coref_expr:
@@ -245,14 +245,14 @@ def load_file(full_name, debug=False):
                             "Error parsing coref " + tok + " in " + line
                         )
                         num = match.group(2)
-                        assert num is not u"", (
+                        assert num is not "", (
                             "Error parsing coref " + tok + " in " + line
                         )
-                        if match.group(1) == u"(":
+                        if match.group(1) == "(":
                             if debug:
                                 print("New coref", num)
                             corefs.append({"label": num, "start": index, "end": None})
-                        if match.group(3) == u")":
+                        if match.group(3) == ")":
                             j = None
                             for i in range(len(corefs) - 1, -1, -1):
                                 if debug:
@@ -357,7 +357,7 @@ class ConllDoc(Document):
             coref["end"] = conll_lookup[coref["end"]][-1]
 
         if speaker_id not in self.speakers:
-            speaker_name = speaker_id.split(u"_")
+            speaker_name = speaker_id.split("_")
             if debug:
                 print("New speaker: ", speaker_id, "name: ", speaker_name)
             self.speakers[speaker_id] = Speaker(speaker_id, speaker_name)
@@ -681,10 +681,8 @@ class ConllCorpus(object):
         with io.open(save_file, "w", encoding="utf-8") as out_file:
             for doc in tqdm(self.docs):
                 for name, part, utt_i, utt, coref in doc.missed_gold:
-                    out_str = (
-                        name + u"\t" + part + u"\t" + utt_i + u'\t"' + utt + u'"\n'
-                    )
-                    out_str += coref + u"\n"
+                    out_str = name + "\t" + part + "\t" + utt_i + '\t"' + utt + '"\n'
+                    out_str += coref + "\n"
                     out_file.write(out_str)
                     if debug:
                         print(out_str)
@@ -802,10 +800,10 @@ class ConllCorpus(object):
             )
 
     def build_and_gather_multiple_arrays(self, save_path):
-        print("🌋 Extracting mentions features with {} job(s)".format(self.n_jobs))
+        print(f"🌋 Extracting mentions features with {self.n_jobs} job(s)")
         parallel_process(self.docs, set_feats, n_jobs=self.n_jobs)
 
-        print("🌋 Building and gathering array with {} job(s)".format(self.n_jobs))
+        print(f"🌋 Building and gathering array with {self.n_jobs} job(s)")
         arr = [{"doc": doc, "i": i} for i, doc in enumerate(self.docs)]
         arrays_dicts = parallel_process(
             arr, get_feats, use_kwargs=True, n_jobs=self.n_jobs
@@ -863,11 +861,7 @@ class ConllCorpus(object):
             print("🌋 Saving vocabulary")
             with io.open(path, "w", encoding="utf-8") as f:
                 if debug:
-                    print(
-                        "voc saved in {path}, length: {length}".format(
-                            path=path, size=len(vocabulary)
-                        )
-                    )
+                    print(f"voc saved in {path}, length: {len(vocabulary)}")
                 for w in tunable_voc:
                     f.write(w + "\n")
 

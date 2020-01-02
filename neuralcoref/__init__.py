@@ -23,18 +23,16 @@ logger = logging.getLogger(__name__)
 if os.path.exists(NEURALCOREF_MODEL_PATH) and os.path.exists(
     os.path.join(NEURALCOREF_MODEL_PATH, "cfg")
 ):
-    logger.info("Loading model from {}".format(NEURALCOREF_MODEL_PATH))
+    logger.info(f"Loading model from {NEURALCOREF_MODEL_PATH}")
     local_model = cached_path(NEURALCOREF_MODEL_PATH)
 else:
     if not os.path.exists(NEURALCOREF_MODEL_PATH):
         os.makedirs(NEURALCOREF_MODEL_PATH)
-    logger.info("Getting model from {} or cache".format(NEURALCOREF_MODEL_URL))
+    logger.info(f"Getting model from {NEURALCOREF_MODEL_URL} or cache")
     downloaded_model = cached_path(NEURALCOREF_MODEL_URL)
 
     logger.info(
-        "extracting archive file {} to dir {}".format(
-            downloaded_model, NEURALCOREF_MODEL_PATH
-        )
+        f"extracting archive file {downloaded_model} to dir {NEURALCOREF_MODEL_PATH}"
     )
     with tarfile.open(downloaded_model, "r:gz") as archive:
         archive.extractall(NEURALCOREF_CACHE)

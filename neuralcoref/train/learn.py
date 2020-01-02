@@ -106,9 +106,7 @@ def decrease_lr(optim_func, factor=0.1, min_lrs=0, eps=0, verbose=True):
         if old_lr - new_lr > eps:
             param_group["lr"] = new_lr
             if verbose:
-                print(
-                    "Reducing learning rate" " of group {} to {:.4e}.".format(i, new_lr)
-                )
+                print(f"Reducing learning rate" " of group {i} to {new_lr:.4e}.")
     return new_lr
 
 
@@ -179,7 +177,7 @@ def run_model(args):
     eval_evaluator.build_test_file()
     score, f1_conll, ident = eval_evaluator.get_score()
     elapsed = time.time() - start_time
-    print("|| s/evaluation {:5.2f}".format(elapsed))
+    print(f"|| s/evaluation {elapsed:5.2f}")
     writer.add_scalar("eval/" + "F1_conll", f1_conll, 0)
 
     # Preparing dataloader
@@ -219,7 +217,7 @@ def run_model(args):
         lower_eval = 0
         for epoch in range(start_epoch, end_epoch):
             """ Run an epoch """
-            print("🚘 {} Epoch {:d}".format(save_name, epoch))
+            print(f"🚘 {save_name} Epoch {epoch:d}")
             model.train()
             start_time_log = time.time()
             start_time_epoch = time.time()
@@ -274,29 +272,26 @@ def run_model(args):
                 g_step += 1
                 if batch_i % args.log_interval == 0 and batch_i > 0:
                     elapsed = time.time() - start_time_log
+                    lr = optim_func.param_groups[0]["lr"]
+                    ea = elapsed * 1000 / args.log_interval
+                    li = loss.item()
                     print(
-                        "| epoch {:3d} | {:5d}/{:5d} batches | lr {:.2e} | ms/batch {:5.2f} | "
-                        "loss {:.2e}".format(
-                            epoch,
-                            batch_i,
-                            len(dataloader),
-                            optim_func.param_groups[0]["lr"],
-                            elapsed * 1000 / args.log_interval,
-                            loss.item(),
-                        )
+                        f"| epoch {epoch:3d} | {batch_i:5d}/{len(dataloader):5d} batches | "
+                        f"lr {lr:.2e} | ms/batch {ea:5.2f} | "
+                        f"loss {li:.2e}"
                     )
                     start_time_log = time.time()
             elapsed_all = time.time() - start_time_all
             elapsed_epoch = time.time() - start_time_epoch
+            ep = elapsed_epoch / 60
+            ea = (
+                elapsed_all
+                / 3600
+                * float(end_epoch - epoch)
+                / float(epoch - start_epoch + 1)
+            )
             print(
-                "|| min/epoch {:5.2f} | est. remaining time (h) {:5.2f} | loss {:.2e}".format(
-                    elapsed_epoch / 60,
-                    elapsed_all
-                    / 3600
-                    * float(end_epoch - epoch)
-                    / float(epoch - start_epoch + 1),
-                    epoch_loss,
-                )
+                f"|| min/epoch {ep:5.2f} | est. remaining time (h) {ea:5.2f} | loss {epoch_loss:.2e}"
             )
             writer.add_scalar("epoch/" + "loss", epoch_loss, g_step)
             if epoch % args.conll_train_interval == 0:
@@ -304,18 +299,16 @@ def run_model(args):
                 train_evaluator.build_test_file()
                 score, f1_conll, ident = train_evaluator.get_score()
                 elapsed = time.time() - start_time
-                print(
-                    "|| min/train evaluation {:5.2f} | F1_conll {:5.2f}".format(
-                        elapsed / 60, f1_conll
-                    )
-                )
+                ep = elapsed_epoch / 60
+                print(f"|| min/train evaluation {ep:5.2f} | F1_conll {f1_conll:5.2f}")
                 writer.add_scalar("epoch/" + "F1_conll", f1_conll, g_step)
             if epoch % args.conll_eval_interval == 0:
                 start_time = time.time()
                 eval_evaluator.build_test_file()
                 score, f1_conll, ident = eval_evaluator.get_score()
                 elapsed = time.time() - start_time
-                print("|| min/evaluation {:5.2f}".format(elapsed / 60))
+                ep = elapsed_epoch / 60
+                print(f"|| min/evaluation {ep:5.2f}")
                 writer.add_scalar("eval/" + "F1_conll", f1_conll, g_step)
                 g_step += 1
                 save_path = args.save_path + save_name + "_" + str(epoch)
@@ -343,7 +336,8 @@ def run_model(args):
         eval_evaluator.build_test_file()
         score, f1_conll, ident = eval_evaluator.get_score()
         elapsed = time.time() - start_time
-        print("|| min/evaluation {:5.2f}".format(elapsed / 60))
+        ep = elapsed / 60
+        print(f"|| min/evaluation {ep:5.2f}")
         writer.add_scalar("eval/" + "F1_conll", f1_conll, g_step)
         g_step += 1
         save_path = args.save_path + save_name + "_" + str(epoch)

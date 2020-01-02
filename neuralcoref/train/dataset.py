@@ -77,11 +77,11 @@ class NCDataset(Dataset):
                 continue
             numpy_files_found = True
             print(file_name, end=", ")
-            datas[file_name.split(u".")[0]] = np.load(
+            datas[file_name.split(".")[0]] = np.load(
                 data_path + file_name, mmap_mode="r" if params.lazy else None
             )
         if not numpy_files_found:
-            raise ValueError("Can't find numpy files in {}".format(data_path))
+            raise ValueError(f"Can't find numpy files in {data_path}")
 
         # Gather arrays in two lists of tuples for mention and pairs
         if not params.lazy:
@@ -90,7 +90,7 @@ class NCDataset(Dataset):
                     *(
                         arr
                         for key, arr in sorted(datas.items())
-                        if key.startswith(u"mentions")
+                        if key.startswith("mentions")
                     )
                 )
             )
@@ -99,7 +99,7 @@ class NCDataset(Dataset):
                     *(
                         arr
                         for key, arr in sorted(datas.items())
-                        if key.startswith(u"pairs")
+                        if key.startswith("pairs")
                     )
                 )
             )

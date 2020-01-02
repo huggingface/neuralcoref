@@ -308,7 +308,7 @@ class Mention(spacy.tokens.Span):
         speaker=None,
         gold_label=None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         # We need to override __new__ see http://cython.readthedocs.io/en/latest/src/userguide/special_methods.html
         obj = spacy.tokens.Span.__new__(
@@ -451,7 +451,7 @@ class Speaker(object):
         ]
 
     def __str__(self):
-        return "{} <names> {}".format(self.speaker_id, self.speaker_names)
+        return f"{self.speaker_id} <names> {self.speaker_names}"
 
     def add_mention(self, mention):
         """ Add a Mention of the Speaker"""
@@ -529,7 +529,7 @@ class EmbeddingExtractor:
     def normalize_word(w):
         if w is None:
             return MISSING_WORD
-        return re.sub(r"\d", u"0", w.lower_)
+        return re.sub(r"\d", "0", w.lower_)
 
     def get_document_embedding(self, utterances_list):
         """ Embedding for the document """
@@ -689,13 +689,14 @@ class Document(object):
         return conll, genre
 
     def __str__(self):
-        return "<utterances, speakers> \n {}\n<mentions> \n {}".format(
-            "\n ".join(
-                unicode_(i) + " " + unicode_(s)
-                for i, s in zip(self.utterances, self.utterances_speaker)
-            ),
-            "\n ".join(unicode_(i) + " " + unicode_(i.speaker) for i in self.mentions),
+        formatted = "\n ".join(
+            unicode_(i) + " " + unicode_(s)
+            for i, s in zip(self.utterances, self.utterances_speaker)
         )
+        mentions = "\n ".join(
+            unicode_(i) + " " + unicode_(i.speaker) for i in self.mentions
+        )
+        return f"<utterances, speakers> \n {formatted}\n<mentions> \n {mentions}"
 
     def __len__(self):
         """ Return the number of mentions (not utterances) since it is what we really care about """
@@ -956,7 +957,7 @@ class Document(object):
 
 
 def mention_detection_debug(sentence):
-    print(u"🌋 Loading spacy model")
+    print("🌋 Loading spacy model")
     try:
         spacy.info("en_core_web_sm")
         model = "en_core_web_sm"
@@ -978,4 +979,4 @@ if __name__ == "__main__":
         sent = sys.argv[1]
         mention_detection_debug(sent)
     else:
-        mention_detection_debug(u"My sister has a dog. She loves him.")
+        mention_detection_debug("My sister has a dog. She loves him.")
