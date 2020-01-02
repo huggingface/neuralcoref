@@ -10,7 +10,7 @@ from neuralcoref.neuralcoref import NeuralCoref
 from neuralcoref.file_utils import NEURALCOREF_MODEL_URL, NEURALCOREF_MODEL_PATH, NEURALCOREF_CACHE, cached_path
 
 __all__ = ['NeuralCoref', 'add_to_pipe']
-__version__ = "4.0.0"
+__version__ = "4.1.0"
 
 logger = logging.getLogger(__name__)
 
