@@ -100,7 +100,7 @@ Training on a new language is now possible. However, do not expect it to be a pl
 
 To boot-strap your work, I detail here the general step you should follow:
 - Find a corpus with coreference annotations (as always, the bigger, the better).
-- Check that spaCy [support your language](https://spacy.io/models/) (i.e. is able to parse it). If not, you will have to find another parser that is able to parse your language and integrate it with the project (might involve quite large modifications to neuralcoref depending on the parser).
+- Check that spaCy [supports your language](https://spacy.io/models/) (i.e. is able to parse it). If not, you will have to find another parser that is able to parse your language and integrate it with the project (might involve quite large modifications to neuralcoref depending on the parser).
 - Find a set of pre-trained word vectors in your language (gloVe or others).
 - If your dataset does not follow the tabular `*_conll` file format (see [details on the CoNLL file format](http://conll.cemantix.org/2012/data.html) on the CoNLL website), you will have to tweak the `load_file` function in [conllparser.py](/conllparser.py) to adapt it to your file format.
 - Adapt the mention extraction function to your language parse trees (`extract_mentions_spans` in [document.py](/document.py)) to reach an acceptable identification of mentions (the function should output the list of all possible mention in a document: pronouns, nouns, noun phrases and all the nested possible combinations).
