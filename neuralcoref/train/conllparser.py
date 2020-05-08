@@ -351,7 +351,7 @@ class ConllDoc(Document):
             missing_values = [key for key in ['label', 'start', 'end', ] if coref.get(key, None) is None]
             if missing_values:
                 found_values = {key: coref[key] for key in ['label', 'start', 'end'] if coref.get(key, None) is not None}
-                raise Exception(f"Coref {str(found_values)} with empty field(s) {', '.join(missing_values)} found in {self.name}")
+                raise Exception(f"Coref {self.name} with fields {found_values} has empty values for the keys {missing_values}.")
 
             coref["start"] = conll_lookup[coref["start"]][0]
             coref["end"] = conll_lookup[coref["end"]][-1]
