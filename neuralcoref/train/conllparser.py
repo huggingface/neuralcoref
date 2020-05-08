@@ -348,7 +348,7 @@ class ConllDoc(Document):
         # Convert conll tokens coref index in spacy tokens indexes
         identified_gold = [False] * len(corefs)
         for coref in corefs:
-            missing_values = [key for key in ['label', 'start', 'end', ] if coref[key] is None]
+            missing_values = [key for key in ['label', 'start', 'end', ] if coref.get(key, None) is None]
             if missing_values:
                 found_values = {key: coref[key] for key in ['label', 'start', 'end'] if coref[key] is not None}
                 raise Exception(f"Coref {str(found_values)} with empty field(s) {', '.join(missing_values)} found in {self.name}")
