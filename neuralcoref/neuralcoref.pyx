@@ -1,6 +1,6 @@
 # cython: infer_types=True, boundscheck=False
 # distutils: language=c++
-""" NeuralCoref resolution spaCy v2.0 pipeline component 
+""" NeuralCoref resolution spaCy v2.0 pipeline component
 Custom pipeline components: https://spacy.io//usage/processing-pipelines#custom-components
 Compatible with: spaCy v2.0.0+
 """
@@ -126,7 +126,7 @@ NSUBJ_OR_DEP = ["nsubj", "dep"]
 CONJ_OR_PREP = ["conj", "prep"]
 LEAVE_DEP = ["det", "compound", "appos"]
 KEEP_DEP = ["nsubj", "dobj", "iobj", "pobj"]
-REMOVE_POS = ["CCONJ", "INTJ", "ADP"]
+REMOVE_POS = ["CCONJ", "SCONJ", "INTJ", "ADP"]
 LOWER_NOT_END = ["'s", ',', '.', '!', '?', ':', ';']
 PUNCTS = [".", "!", "?"]
 ACCEPTED_ENTS = ["PERSON", "NORP", "FACILITY", "ORG", "GPE", "LOC", "PRODUCT", "EVENT", "WORK_OF_ART", "LANGUAGE"]
@@ -327,7 +327,7 @@ cdef (int, int) enlarge_span(TokenC* doc_c, int i, int sent_start, int sent_end,
         maxchild_idx -= 1 # We don't want mentions finishing with 's or conjunctions/punctuation
     # if debug: print("maxchild_idx", maxchild_idx)
     while minchild_idx <= maxchild_idx and minchild_idx < sent_end - 1 \
-          and (inside(doc_c[minchild_idx].pos, hashes.remove_pos) 
+          and (inside(doc_c[minchild_idx].pos, hashes.remove_pos)
                or inside(doc_c[minchild_idx].lex.lower, hashes.lower_not_end)):
         minchild_idx += 1 # We don't want mentions starting with 's or conjunctions/punctuation
         # if debug: print("minchild_idx", minchild_idx)
@@ -882,7 +882,7 @@ cdef class NeuralCoref(object):
         if tuned and hash_w in self.tuned_vectors:
             return self.tuned_vectors[hash_w]
         return self.get_static(hash_w)
- 
+
     def get_word_in_sentence(self, int i, Span sent):
         if i < sent.start or i >= sent.end:
             return self.tuned_vectors[self.hashes.missing_word]
