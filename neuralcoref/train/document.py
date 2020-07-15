@@ -99,7 +99,7 @@ def _extract_from_sent(doc, span, blacklist=True, debug=False):
     keep_dep = ["nsubj", "dobj", "iobj", "pobj"]
     nsubj_or_dep = ["nsubj", "dep"]
     conj_or_prep = ["conj", "prep"]
-    remove_pos = ["CCONJ", "INTJ", "ADP"]
+    remove_pos = ["CCONJ", "SCONJ", "INTJ", "ADP"]
     lower_not_end = ["'s", ",", ".", "!", "?", ":", ";"]
 
     # Utility to remove bad endings
