@@ -845,7 +845,7 @@ class Document(object):
             mention.words_embeddings_ = words_embeddings_
 
     def get_single_mention_features(self, mention):
-        """ Features for anaphoricity test (signle mention features + genre if conll)"""
+        """ Features for anaphoricity test (single mention features + genre if conll)"""
         features_ = mention.features_
         features_["DocGenre"] = self.genre_
         return (features_, np.concatenate([mention.features, self.genre], axis=0))
