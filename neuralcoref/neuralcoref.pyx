@@ -41,7 +41,7 @@ from thinc.v2v import Model, ReLu, Affine
 from thinc.api import chain, clone
 # from thinc.neural.util import get_array_module
 
-from .file_utils import NEURALCOREF_MODEL_PATH
+from file_utils import NEURALCOREF_MODEL_PATH
 
 ##############################
 ## DEFAULT INFERENCE VALUES ##
