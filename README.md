@@ -14,7 +14,6 @@ Home for code for the PII Hackathon
 - git clone  https://github.com/ontocord/pii_processing
 - cd pii_processing/
 - python setup.py install
-- pip install datasets transformers faker sentencepiece
 - python -m nltk.downloader punkt stopwords  wordnet
 - python -m spacy download en_core_web_lg
 
