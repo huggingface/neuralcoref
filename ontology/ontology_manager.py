@@ -463,3 +463,4 @@ if __name__ == "__main__":
     manager = OntologyManager(data_dir=data_dir, shared_dir=shared_dir)
     txt = manager.tokenize(sentence)
     print(txt)
+  
