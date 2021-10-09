@@ -33,8 +33,8 @@ from transformers import pipeline, XLMRobertaForTokenClassification, BertForToke
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.path.pardir, os.path.pardir)))
-from pii_pro.pii.round_trip_trans import RoundTripTranslate
-from pii_pro.ontology.ontology_manager import OntologyManager
+from pii_processing.pii.round_trip_trans import RoundTripTranslate
+from pii_processing.ontology.ontology_manager import OntologyManager
 
 class Processor (OntologyManager):
   """
