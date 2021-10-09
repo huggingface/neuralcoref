@@ -61,12 +61,18 @@ import transformers
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.path.pardir, os.path.pardir)))
-from pii_pro.ontology.ontology_manager import OntologyManager
-from pii_pro.ontology.ontology_builder_data import OntologyBuilderData
+from pii_processing.ontology.ontology_manager import OntologyManager
+from pii_processing.ontology.ontology_builder_data import OntologyBuilderData
 
+default_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                             os.path.pardir, "data"))
 class OntologyBuilder (OntologyManager, OntologyBuilderData):
 
-  def __init__(self, data_dir="./pii_pro/data", shared_dir=None):
+  def __init__(self, data_dir=None, shared_dir=None):
+    if data_dir is None: data_dir = default_data_dir 
+    if shared_dir is None: shared_dir = data_dir
+    os.system(f"mkdir -p {data_dir}")
+    os.system(f"mkdir -p {shared_dir}")
     OntologyManager.__init__(self, data_dir=data_dir, shared_dir=shared_dir)
     self.word2en = {}
 
@@ -116,20 +122,23 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
     self.load_cn_data()
     shared_dir = self.shared_dir
     data_dir =  self.data_dir
-    print (shared_dir, data_dir)
-    if not os.path.exists(f"{shared_dir}/syn.csv"):
+    if not os.path.exists(f"{data_dir}/syn.csv"):
         os.system(f"grep '\/r\/Synonym\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/syn.csv")
+    if not os.path.exists(f"{data_dir}/sim.csv"):
         os.system(f"grep 'SimilarTo\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/sim.csv")
-        #os.system(f"grep 'MannerOf\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/manner.csv")
-        #os.system(f"grep 'DistinctFrom\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/dest.csv")
+    if not os.path.exists(f"{data_dir}/deri.csv"):
         os.system(f"grep 'DerivedFrom\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/deri.csv")
-        #os.system(f"grep 'Antonym\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/anti.csv")
+    if not os.path.exists(f"{data_dir}/erel.csv"):
         os.system(f"grep 'EtymologicallyRelatedTo\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/erel.csv")
+    if not os.path.exists(f"{data_dir}/ederi.csv"):
         os.system(f"grep 'EtymologicallyDerivedFrom\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/ederi.csv")
+    if not os.path.exists(f"{data_dir}/rel.csv"):
         os.system(f"grep 'RelatedTo\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/rel.csv")
+    if not os.path.exists(f"{data_dir}/formof.csv"):
         os.system(f"grep 'FormOf\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/formof.csv")
+    if not os.path.exists(f"{data_dir}/isa.csv"):
         os.system(f"grep 'IsA\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/isa.csv")
-        os.system(f"mv {data_dir}/syn.csv {data_dir}/sim.csv  {data_dir}/deri.csv  {data_dir}/erel.csv {data_dir}/ederi.csv {data_dir}/rel.csv {data_dir}/formof.csv {data_dir}/isa.csv {shared_dir}")
+    os.system(f"mv {data_dir}/syn.csv {data_dir}/sim.csv  {data_dir}/deri.csv  {data_dir}/erel.csv {data_dir}/ederi.csv {data_dir}/rel.csv {data_dir}/formof.csv {data_dir}/isa.csv {shared_dir}")
     rel2 = OrderedDict()
     for rel_type in ('syn', 'sim', 'deri', 'erel', 'ederi', 'rel', 'formof','isa') : #'dest', 'anti', 'manner', 
       i = 0
@@ -278,7 +287,7 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
   def create_eng2multilang_dict(self):
       shared_dir = self.shared_dir
       if hasattr(self, 'word2lang') and self.word2lang: return
-      if os.path.exists(f"{shared_dir}/conceptnet_en.json"):
+      if False and os.path.exists(f"{shared_dir}/conceptnet_en.json"):
         self.en = json.load(open(f"{shared_dir}/conceptnet_en.json", "rb"))
         self.word2en = json.load(open(f"{shared_dir}/conceptnet_word2en.json", "rb"))
         self.word2lang= json.load(open(f"{shared_dir}/conceptnet_word2lang.json", "rb"))
