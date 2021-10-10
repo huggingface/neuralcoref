@@ -64,15 +64,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
 from pii_processing.ontology.ontology_manager import OntologyManager
 from pii_processing.ontology.ontology_builder_data import OntologyBuilderData
 
-default_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                             os.path.pardir, "data"))
 class OntologyBuilder (OntologyManager, OntologyBuilderData):
 
   def __init__(self, data_dir=None, tmp_dir=None):
-    if data_dir is None: data_dir = default_data_dir 
-    if tmp_dir is None: tmp_dir = "/tmp/"
-    os.system(f"mkdir -p {data_dir}")
-    os.system(f"mkdir -p {tmp_dir}")
     OntologyManager.__init__(self, data_dir=data_dir, tmp_dir=tmp_dir)
     self.word2en = {}
 
