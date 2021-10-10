@@ -51,14 +51,14 @@ class OntologyManager:
   default_strip_chars="-,~`.?!@#$%^&*(){}[]|\\/-_+=<>;'\""
   stopwords = set(stopwords.words())
   x_lingual_onto_name = "yago_cn_wn"
-
+  default_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                             os.path.pardir, "data"))
+      
   def __init__(self, target_lang="en", data_dir="./pii_pro/data/",  shared_dir=None, max_word_len=4, compound_word_step =3,  strip_chars=None,  \
                  upper_ontology=None,  x_lingual_lexicon_by_prefix_file="lexicon_by_prefix.json.gz", target_lang_config_file=None, x_lingual2ner_file=None, \
                  connector = "_"):
     self._max_lexicon = 0
-    if data_dir is None:
-      data_dir = "./"
-    if shared_dir is None: shared_dir=data_dir
+    if data_dir is None: data_dir = default_data_dir 
     self.shared_dir = shared_dir
     self.data_dir = data_dir
     if strip_chars is None:
