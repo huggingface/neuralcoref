@@ -98,15 +98,12 @@ class Processor (OntologyManager):
       "zh": ("Davlan/xlm-roberta-base-ner-hrl", XLMRobertaForTokenClassification ),
   }
 
-  def __init__(self, target_lang="en", data_dir="./",  max_onto_len=4, max_compound_word =3, ner_regexes=None,  strip_chars=None,  \
-              domain_ontology_paths=None, upper_ontology=None, ontology=None, ontology_compound_word_start=None, \
-              connector = "_", en_spacy_models=[]):
-    super().__init__(target_lang=target_lang, data_dir=os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                                                                          os.path.pardir, 'data')),  \
-                       max_onto_len=max_onto_len, max_compound_word =max_compound_word, ner_regexes=ner_regexes,  strip_chars=strip_chars,  \
-                       domain_ontology_paths=domain_ontology_paths, upper_ontology=upper_ontology, ontology=ontology, ontology_compound_word_start=ontology_compound_word_start, \
-                       connector = connector)
-    self.target_lang = target_lang
+  def __init__(self,  target_lang="en", data_dir=None,  shared_dir=None, max_word_len=4, compound_word_step =3,  strip_chars=None,  \
+                 upper_ontology=None,  x_lingual_lexicon_by_prefix_file="lexicon_by_prefix.json.gz", target_lang_config_file=None, x_lingual2ner_file=None, \
+                 connector = "_", en_spacy_models=[]):
+    super().__init__(target_lang=target_lang,  data_dir=data_dir,  shared_dir=shared_dir, max_word_len=max_word_len, compound_word_step = compound_word_step,  strip_chars=strip_chars,  \
+                 upper_ontology=upper_ontology,  x_lingual_lexicon_by_prefix_file=x_lingual_lexicon_by_prefix_file, target_lang_config_file=target_lang_config_file, x_lingual2ner_file=x_lingual2ner_file, \
+                 connector = onnector)
 
     if False:
       #hf stuff. we assume we are working only in CPU mode.
