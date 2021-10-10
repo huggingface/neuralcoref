@@ -98,10 +98,10 @@ class Processor (OntologyManager):
       "zh": ("Davlan/xlm-roberta-base-ner-hrl", XLMRobertaForTokenClassification ),
   }
 
-  def __init__(self,  target_lang="en", data_dir=None,  shared_dir=None, max_word_len=4, compound_word_step =3,  strip_chars=None,  \
+  def __init__(self,  target_lang="en", data_dir=None,  tmp_dir=None, max_word_len=4, compound_word_step =3,  strip_chars=None,  \
                  upper_ontology=None,  x_lingual_lexicon_by_prefix_file="lexicon_by_prefix.json.gz", target_lang_config_file=None, x_lingual2ner_file=None, \
                  connector = "_", en_spacy_models=[]):
-    super().__init__(target_lang=target_lang,  data_dir=data_dir,  shared_dir=shared_dir, max_word_len=max_word_len, compound_word_step = compound_word_step,  strip_chars=strip_chars,  \
+    super().__init__(target_lang=target_lang,  data_dir=data_dir,  tmp_dir=tmp_dir, max_word_len=max_word_len, compound_word_step = compound_word_step,  strip_chars=strip_chars,  \
                  upper_ontology=upper_ontology,  x_lingual_lexicon_by_prefix_file=x_lingual_lexicon_by_prefix_file, target_lang_config_file=target_lang_config_file, x_lingual2ner_file=x_lingual2ner_file, \
                  connector = onnector)
 
