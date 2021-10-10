@@ -281,7 +281,7 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
   def create_eng2multilang_dict(self):
       tmp_dir = self.tmp_dir
       if hasattr(self, 'word2lang') and self.word2lang: return
-      if False and os.path.exists(f"{tmp_dir}/conceptnet_en.json"):
+      if os.path.exists(f"{tmp_dir}/conceptnet_en.json"):
         self.en = json.load(open(f"{tmp_dir}/conceptnet_en.json", "rb"))
         self.word2en = json.load(open(f"{tmp_dir}/conceptnet_word2en.json", "rb"))
         self.word2lang= json.load(open(f"{tmp_dir}/conceptnet_word2lang.json", "rb"))
