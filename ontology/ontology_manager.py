@@ -54,12 +54,13 @@ class OntologyManager:
   default_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.path.pardir, "data"))
       
-  def __init__(self, target_lang="en", data_dir="./pii_pro/data/",  shared_dir=None, max_word_len=4, compound_word_step =3,  strip_chars=None,  \
+  def __init__(self, target_lang="en", data_dir=None,  tmp_dir=None, max_word_len=4, compound_word_step =3,  strip_chars=None,  \
                  upper_ontology=None,  x_lingual_lexicon_by_prefix_file="lexicon_by_prefix.json.gz", target_lang_config_file=None, x_lingual2ner_file=None, \
                  connector = "_"):
     self._max_lexicon = 0
     if data_dir is None: data_dir = default_data_dir 
-    self.shared_dir = shared_dir
+    if tmp_dir is None: tmp_dir = "/tmp/"
+    self.tmp_dir = tmp_dir
     self.data_dir = data_dir
     if strip_chars is None:
       strip_chars = self.default_strip_chars
@@ -92,7 +93,7 @@ class OntologyManager:
   
   def load_x_lingual_lexicon_from_x_lingual2ner_file(self, x_lingual2ner_file):
     data_dir = self.data_dir
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     if x_lingual2ner_file is None: return
     if os.path.exists(x_lingual2ner_file):
       word2ner = json.load(open(x_lingual2ner_file, "rb"))
@@ -105,7 +106,7 @@ class OntologyManager:
 
   def load_x_lingual_lexicon_from_prefix_file(self, x_lingual_lexicon_by_prefix_file="lexicon_by_prefix.json.gz"):
     data_dir = self.data_dir
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     if x_lingual_lexicon_by_prefix_file is not None:
       if not os.path.exists(x_lingual_lexicon_by_prefix_file):
         x_lingual_lexicon_by_prefix_file = f"{data_dir}/{x_lingual_lexicon_by_prefix_file}"
@@ -135,19 +136,18 @@ class OntologyManager:
   def save_x_lingual_lexicon_prefix_file(self, x_lingual_lexicon_by_prefix_file="lexicon_by_prefix.json.gz"):
     """ saves the base cross lingual leixcon """
     data_dir = self.data_dir
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     print (data_dir, x_lingual_lexicon_by_prefix_file)
     x_lingual_lexicon_by_prefix_file = x_lingual_lexicon_by_prefix_file.replace(".gz", "")
     if not x_lingual_lexicon_by_prefix_file.startswith(data_dir): 
       x_lingual_lexicon_by_prefix_file=f"{data_dir}/{x_lingual_lexicon_by_prefix_file}"  
     json.dump(self.x_lingual_lexicon_by_prefix,open(x_lingual_lexicon_by_prefix_file, "w", encoding="utf8"), indent=1)
     os.system(f"gzip {x_lingual_lexicon_by_prefix_file}")
-    if shared_dir is not None and data_dir != shared_dir: os.system(f"cp {x_lingual_lexicon_by_prefix_file}.gz {shared_dir}")
     os.system(f"rm {x_lingual_lexicon_by_prefix_file}")
 
   def load_target_lang_config(self,  target_lang_config_file=None, target_lang=None):
     data_dir = self.data_dir
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     if target_lang_config_file is None:
       if os.path.exists(os.path.join(data_dir, f'{target_lang}.json')): 
         target_lang_config_file=  os.path.join(data_dir, f'{target_lang}.json')
@@ -197,11 +197,10 @@ class OntologyManager:
   def save_target_lang_config(self, target_lang_config_file):
     if target_lang_config_file is None: return
     data_dir = self.data_dir
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     json.dump(self.target_lang_config,open(f"{data_dir}/{target_lang_config_file}", "w", encoding="utf8"), indent=1)
     #os.system(f"gzip {data_dir}/{target_lang_config_file}")
-    if shared_dir is not None and data_dir != shared_dir: os.system(f"cp {data_dir}/{target_lang_config_file} {shared_dir}")
-
+    
   def _has_nonstopword(self, wordArr):
     for word in wordArr:
       if word.strip(self.strip_chars) not in self.stopwords:
@@ -452,15 +451,12 @@ class OntologyManager:
     return None
 
 if __name__ == "__main__":  
-  try:
-    data_dir = shared_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data"))
-  except:
-    data_dir = shared_dir = "./"
+  data_dir = tmp = None
   if "-s" in sys.argv:
-    shared_dir = sys.argv[sys.argv.indexof("-s")+1]
+    tmp_dir = sys.argv[sys.argv.indexof("-s")+1]
   if "-t" in sys.argv:
     sentence = sys.argv[sys.argv.indexof("-t")+1]
-    manager = OntologyManager(data_dir=data_dir, shared_dir=shared_dir)
+    manager = OntologyManager(data_dir=data_dir, tmp_dir=tmp_dir)
     txt = manager.tokenize(sentence)
     print(txt)
   
