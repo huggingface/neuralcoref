@@ -59,7 +59,7 @@ class OntologyManager:
                  connector = "_"):
     self._max_lexicon = 0
     if data_dir is None: data_dir = default_data_dir 
-    if tmp_dir is None: tmp_dir = "/tmp/"
+    if tmp_dir is None: tmp_dir = "/tmp/pii_processing/"
     self.tmp_dir = tmp_dir
     self.data_dir = data_dir
     if strip_chars is None:
