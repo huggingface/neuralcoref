@@ -68,37 +68,33 @@ default_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.path.pardir, "data"))
 class OntologyBuilder (OntologyManager, OntologyBuilderData):
 
-  def __init__(self, data_dir=None, shared_dir=None):
+  def __init__(self, data_dir=None, tmp_dir=None):
     if data_dir is None: data_dir = default_data_dir 
-    if shared_dir is None: shared_dir = data_dir
+    if tmp_dir is None: tmp_dir = "/tmp/"
     os.system(f"mkdir -p {data_dir}")
-    os.system(f"mkdir -p {shared_dir}")
-    OntologyManager.__init__(self, data_dir=data_dir, shared_dir=shared_dir)
+    os.system(f"mkdir -p {tmp_dir}")
+    OntologyManager.__init__(self, data_dir=data_dir, tmp_dir=tmp_dir)
     self.word2en = {}
 
   def load_cn_data(self):
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     data_dir = self.data_dir
-    if not os.path.exists(f"{data_dir}/conceptnet-assertions-5.7.0.csv"):
-      if not os.path.exists(f"{shared_dir}/conceptnet-assertions-5.7.0.csv.gz"):
+    if not os.path.exists(f"{tmp_dir}/conceptnet-assertions-5.7.0.csv"):
+      if not os.path.exists(f"{tmp_dir}/conceptnet-assertions-5.7.0.csv.gz"):
         os.system(f"wget https://s3.amazonaws.com/conceptnet/downloads/2019/edges/conceptnet-assertions-5.7.0.csv.gz")
-        os.system(f"mv ./conceptnet-assertions-5.7.0.csv.gz {data_dir}")
-        if shared_dir != data_dir: os.system(f"cp {data_dir}/conceptnet-assertions-5.7.0.csv.gz {shared_dir}")
-      else:
-        os.system(f"cp {shared_dir}/conceptnet-assertions-5.7.0.csv.gz {data_dir}")
-      os.system(f"gzip -d {data_dir}/conceptnet-assertions-5.7.0.csv.gz")
+        os.system(f"mv ./conceptnet-assertions-5.7.0.csv.gz {tmp_dir}")
+      os.system(f"gzip -d {tmp_dir}/conceptnet-assertions-5.7.0.csv.gz")
     
   def create_wn_cat(self, keep_percentage=.01):
     """
     extract linkage from conceptnet words and wordnet category words
     """
     self.load_cn_data()
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     data_dir = self.data_dir
-    if not os.path.exists(f"{shared_dir}/wn.csv"):
-      os.system(f"grep '\/wn\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/wn.csv")
-      os.system(f"mv {data_dir}/wn.csv {shared_dir}")
-    wn =  open(f"{shared_dir}/wn.csv", "rb").read().decode().split('\n')
+    if not os.path.exists(f"{tmp_dir}/wn.csv"):
+      os.system(f"grep '\/wn\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/wn.csv")
+    wn =  open(f"{tmp_dir}/wn.csv", "rb").read().decode().split('\n')
     wn = [s.split('\t')[0] for s in wn]
     wn = [s.strip(']').split(',/c/')[1:] for s in wn]
 
@@ -120,29 +116,28 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
     It's unclear if we should expand this much though. 
     """
     self.load_cn_data()
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     data_dir =  self.data_dir
-    if not os.path.exists(f"{data_dir}/syn.csv"):
-        os.system(f"grep '\/r\/Synonym\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/syn.csv")
-    if not os.path.exists(f"{data_dir}/sim.csv"):
-        os.system(f"grep 'SimilarTo\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/sim.csv")
-    if not os.path.exists(f"{data_dir}/deri.csv"):
-        os.system(f"grep 'DerivedFrom\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/deri.csv")
-    if not os.path.exists(f"{data_dir}/erel.csv"):
-        os.system(f"grep 'EtymologicallyRelatedTo\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/erel.csv")
-    if not os.path.exists(f"{data_dir}/ederi.csv"):
-        os.system(f"grep 'EtymologicallyDerivedFrom\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/ederi.csv")
-    if not os.path.exists(f"{data_dir}/rel.csv"):
-        os.system(f"grep 'RelatedTo\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/rel.csv")
-    if not os.path.exists(f"{data_dir}/formof.csv"):
-        os.system(f"grep 'FormOf\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/formof.csv")
-    if not os.path.exists(f"{data_dir}/isa.csv"):
-        os.system(f"grep 'IsA\/' {data_dir}/conceptnet-assertions-5.7.0.csv > {data_dir}/isa.csv")
-    os.system(f"mv {data_dir}/syn.csv {data_dir}/sim.csv  {data_dir}/deri.csv  {data_dir}/erel.csv {data_dir}/ederi.csv {data_dir}/rel.csv {data_dir}/formof.csv {data_dir}/isa.csv {shared_dir}")
+    if not os.path.exists(f"{tmp_dir}/syn.csv"):
+        os.system(f"grep '\/r\/Synonym\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/syn.csv")
+    if not os.path.exists(f"{tmp_dir}/sim.csv"):
+        os.system(f"grep 'SimilarTo\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/sim.csv")
+    if not os.path.exists(f"{tmp_dir}/deri.csv"):
+        os.system(f"grep 'DerivedFrom\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/deri.csv")
+    if not os.path.exists(f"{tmp_dir}/erel.csv"):
+        os.system(f"grep 'EtymologicallyRelatedTo\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/erel.csv")
+    if not os.path.exists(f"{tmp_dir}/ederi.csv"):
+        os.system(f"grep 'EtymologicallyDerivedFrom\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/ederi.csv")
+    if not os.path.exists(f"{tmp_dir}/rel.csv"):
+        os.system(f"grep 'RelatedTo\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/rel.csv")
+    if not os.path.exists(f"{tmp_dir}/formof.csv"):
+        os.system(f"grep 'FormOf\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/formof.csv")
+    if not os.path.exists(f"{tmp_dir}/isa.csv"):
+        os.system(f"grep 'IsA\/' {tmp_dir}/conceptnet-assertions-5.7.0.csv > {tmp_dir}/isa.csv")
     rel2 = OrderedDict()
     for rel_type in ('syn', 'sim', 'deri', 'erel', 'ederi', 'rel', 'formof','isa') : #'dest', 'anti', 'manner', 
       i = 0
-      with open(f"{shared_dir}/{rel_type}.csv", "rb") as f:
+      with open(f"{tmp_dir}/{rel_type}.csv", "rb") as f:
         while True:
           rel = f.readline()
           if not rel: break
@@ -184,13 +179,12 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
     return rel2
 
   def create_cn_ontology(self):
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     data_dir = self.data_dir
-    if os.path.exists(f"{shared_dir}/conceptnet_ontology.json"):
-      return json.load(open(f"{shared_dir}/conceptnet_ontology.json", "rb")), json.load(open(f"{shared_dir}/conceptnet_ontology_cat2word.json", "rb"))
+    if os.path.exists(f"{tmp_dir}/conceptnet_ontology.json"):
+      return json.load(open(f"{tmp_dir}/conceptnet_ontology.json", "rb")), json.load(open(f"{tmp_dir}/conceptnet_ontology_cat2word.json", "rb"))
     categories, typeHash = self.create_wn_cat(1.0)
     rel = self.create_rel()
-    os.system(f"rm {data_dir}/conceptnet-assertions-5.7.0.csv")
     word2wncat = OrderedDict()
     #get a word to category mapping
     for concept, ct in categories:
@@ -280,28 +274,28 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
     cat2word={}
     for key, value in word2wncat.items():
       cat2word[value]=cat2word.get(value,[])+[key]
-    json.dump(rel2, open(f"{shared_dir}/conceptnet_ontology.json", "w", encoding="utf8"), indent=1)
-    json.dump(cat2word, open(f"{shared_dir}/conceptnet_ontology_cat2word.json", "w", encoding="utf8"), indent=1)
+    json.dump(rel2, open(f"{tmp_dir}/conceptnet_ontology.json", "w", encoding="utf8"), indent=1)
+    json.dump(cat2word, open(f"{tmp_dir}/conceptnet_ontology_cat2word.json", "w", encoding="utf8"), indent=1)
     return rel2, cat2word
     
   def create_eng2multilang_dict(self):
-      shared_dir = self.shared_dir
+      tmp_dir = self.tmp_dir
       if hasattr(self, 'word2lang') and self.word2lang: return
-      if False and os.path.exists(f"{shared_dir}/conceptnet_en.json"):
-        self.en = json.load(open(f"{shared_dir}/conceptnet_en.json", "rb"))
-        self.word2en = json.load(open(f"{shared_dir}/conceptnet_word2en.json", "rb"))
-        self.word2lang= json.load(open(f"{shared_dir}/conceptnet_word2lang.json", "rb"))
+      if False and os.path.exists(f"{tmp_dir}/conceptnet_en.json"):
+        self.en = json.load(open(f"{tmp_dir}/conceptnet_en.json", "rb"))
+        self.word2en = json.load(open(f"{tmp_dir}/conceptnet_word2en.json", "rb"))
+        self.word2lang= json.load(open(f"{tmp_dir}/conceptnet_word2lang.json", "rb"))
         return
       self.load_cn_data()
-      if not os.path.exists(f"{shared_dir}/syn.csv"):
-          os.system(f"grep '\/r\/Synonym\/' conceptnet-assertions-5.7.0.csv > {shared_dir}/syn.csv")
+      if not os.path.exists(f"{tmp_dir}/syn.csv"):
+          os.system(f"grep '\/r\/Synonym\/' conceptnet-assertions-5.7.0.csv > {tmp_dir}/syn.csv")
           
       mt5_tok = transformers.AutoTokenizer.from_pretrained("google/mt5-small")
       rel2 = OrderedDict()
       word2lang = {}
       for rel_type in ('syn', ) :
         i = 0
-        rel =  open(f"{shared_dir}/{rel_type}.csv", "rb").read().decode().split('\n')
+        rel =  open(f"{tmp_dir}/{rel_type}.csv", "rb").read().decode().split('\n')
         rel = [s.split('\t')[0] for s in rel]
         rel = [s.strip(']').split(',/c/')[1:] for s in rel]
         for s in rel:
@@ -352,9 +346,9 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
       self.word2lang = word2lang
       for key in list(self.word2en.keys()):
         self.word2en[key] = dict([(a,1) for a in self.word2en[key]])
-      json.dump(self.en, open(f"{shared_dir}/conceptnet_en.json", "w", encoding="utf8"), indent=1)
-      json.dump(self.word2en, open(f"{shared_dir}/conceptnet_word2en.json", "w", encoding="utf8"), indent=1)
-      json.dump(self.word2lang, open(f"{shared_dir}/conceptnet_word2lang.json", "w", encoding="utf8"), indent=1)
+      json.dump(self.en, open(f"{tmp_dir}/conceptnet_en.json", "w", encoding="utf8"), indent=1)
+      json.dump(self.word2en, open(f"{tmp_dir}/conceptnet_word2en.json", "w", encoding="utf8"), indent=1)
+      json.dump(self.word2lang, open(f"{tmp_dir}/conceptnet_word2lang.json", "w", encoding="utf8"), indent=1)
 
 
   def cjk_detect(self, texts):
@@ -370,24 +364,18 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
     return None
 
   def yago_step0(self):
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     data_dir = self.data_dir
     aHash = {}
     onto = {}
     catAll = {}
-    if  os.path.exists(f"{data_dir}/yago0.tsv"):
+    if  os.path.exists(f"{tmp_dir}/yago0.tsv"):
       return
-    if  not os.path.exists(f"{data_dir}/yago0.tsv") and os.path.exists(f"{shared_dir}/yago0.tsv"):
-      os.system(f"cp {shared_dir}/yago0.tsv {data_dir}")
-      return 
-    if not os.path.exists(f"{shared_dir}/yago-wd-simple-types.nt.gz"):
+    if not os.path.exists(f"{tmp_dir}/yago-wd-simple-types.nt.gz"):
       os.system("wget https://yago-knowledge.org/data/yago4/full/2020-02-24/yago-wd-simple-types.nt.gz")
-      os.system(f"mv ./yago-wd-simple-types.nt.gz {data_dir}")
-      if shared_dir != data_dir: os.system(f"cp {data_dir}/yago-wd-simple-types.nt.gz {shared_dir}")
-    else:
-      if shared_dir != data_dir: os.system(f"cp {shared_dir}/yago-wd-simple-types.nt.gz {data_dir}")
-    with gzip.open(f"{data_dir}/yago-wd-simple-types.nt.gz") as f: #gzip.
-      with open(f"{data_dir}/yago0.tsv", "w", encoding="utf8") as o:
+      os.system(f"mv ./yago-wd-simple-types.nt.gz {tmp_dir}")
+    with gzip.open(f"{tmp_dir}/yago-wd-simple-types.nt.gz") as f: #gzip.
+      with open(f"{tmp_dir}/yago0.tsv", "w", encoding="utf8") as o:
         while True:
           line = f.readline()
           if not line: break
@@ -407,34 +395,26 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
           else:
             print (rel)
     self.yago_cat_stats = catAll                                    
-    os.system(f"sort --parallel=32 {data_dir}/yago0.tsv --o {data_dir}/yago0.tsv")
-    os.system(f"cp {data_dir}/yago0.tsv {shared_dir}")
+    os.system(f"sort --parallel=32 {tmp_dir}/yago0.tsv --o {tmp_dir}/yago0.tsv")
 
   def yago_step1(self):
     word2en = {}
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     data_dir = self.data_dir
-    if  os.path.exists(f"{data_dir}/yago_ontology.tsv") or os.path.exists(f"{shared_dir}/yago_ontology.tsv"):
-      if not os.path.exists(f"{data_dir}/yago_ontology.tsv"): os.system(f"cp {shared_dir}/yago_ontology.tsv {data_dir}")
-      #word2en = json.load(open(f"{shared_dir}/yago_word2en.json", "rb"))
-      #for word, en in word2en.items():
-      #  if word.count("_") < 5 and en.count("_") < 5 and word not in self.word2en:
-      #    self.word2en[word] = en
+    if  os.path.exists(f"{tmp_dir}/yago_ontology.tsv"):
       return 
-    if not os.path.exists(f"{shared_dir}/yago0.tsv"):
+    if not os.path.exists(f"{tmp_dir}/yago0.tsv"):
       self.yago_step0()
-    elif not os.path.exists(f"{data_dir}/yago0.tsv"):
-      os.system(f"cp {shared_dir}/yago0.tsv {data_dir}")
 
     _idx= 0
-    with open(f"{data_dir}/yago_work_of_art.tsv", "w", encoding="utf8") as a:
-      with open(f"{data_dir}/yago_problem.tsv", "w", encoding="utf8") as p:
+    with open(f"{tmp_dir}/yago_work_of_art.tsv", "w", encoding="utf8") as a:
+      with open(f"{tmp_dir}/yago_problem.tsv", "w", encoding="utf8") as p:
         for _idx in range(2):
           prev_entity =""
           cats = []
-          with open(f"{data_dir}/yago{_idx}.tsv", "rb") as f:
+          with open(f"{tmp_dir}/yago{_idx}.tsv", "rb") as f:
             _idx +=1
-            with open(f"{data_dir}/yago{_idx}.tsv", "w", encoding="utf8") as o:
+            with open(f"{tmp_dir}/yago{_idx}.tsv", "w", encoding="utf8") as o:
               while True:
                 line = f.readline()
                 if not line: break
@@ -479,25 +459,17 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
                       o.write (prev_entity.translate(trannum) +"\t" +cats[0][0]+"\n")
                     else:
                       p.write (prev_entity.translate(trannum)+"\n")
-          os.system(f"sort --parallel=32 {data_dir}/yago{_idx}.tsv --o {data_dir}/yago{_idx}.tsv")
+          os.system(f"sort --parallel=32 {tmp_dir}/yago{_idx}.tsv --o {tmp_dir}/yago{_idx}.tsv")
                                             
-    os.system(f"cp {data_dir}/yago{_idx}.tsv {data_dir}/yago_ontology.tsv")
-    os.system(f"cp {data_dir}/yago_ontology.tsv {shared_dir}")
-    os.system(f"cp {data_dir}/yago_work_of_art.tsv {shared_dir}")
-    os.system(f"cp {data_dir}/yago_problem.tsv {shared_dir}")
-    #json.dump(word2en, open(f"{shared_dir}/yago_word2en.json", "w", encoding="utf8"), indent=1)
-    #for word, en in word2en.items():
-    #  if word.count("_") < 5 and en.count("_") < 5 and word not in self.word2en:
-    #    self.word2en[word] = en
+    os.system(f"cp {tmp_dir}/yago{_idx}.tsv {tmp_dir}/yago_ontology.tsv")
 
   def yago_step2(self):
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     data_dir = self.data_dir
-    if os.path.exists(f"{data_dir}/yago_ontology.json") or os.path.exists(f"{shared_dir}/yago_ontology.json"):
-      if not os.path.exists(f"{data_dir}/yago_ontology.json"): os.system(f"cp {shared_dir}/yago_ontology.json {data_dir}")
-      return json.load(open(f"{data_dir}/yago_ontology.json"))
+    if os.path.exists(f"{tmp_dir}/yago_ontology.json"):
+      return json.load(open(f"{tmp_dir}/yago_ontology.json"))
 
-    if not os.path.exists(f"{data_dir}/yago_ontology.tsv"):
+    if not os.path.exists(f"{tmp_dir}/yago_ontology.tsv"):
       self.yago_step1()
 
     Synset = wn.synset
@@ -527,7 +499,7 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
 
     new_yago_ontology = {}
     mt5_tok = transformers.AutoTokenizer.from_pretrained("google/mt5-small")
-    yago_dict = dict([a.split("\t") for a in open(f"{data_dir}/yago_ontology.tsv", "rb").read().decode().split("\n") if len(a.split("\t"))== 2 ])
+    yago_dict = dict([a.split("\t") for a in open(f"{tmp_dir}/yago_ontology.tsv", "rb").read().decode().split("\n") if len(a.split("\t"))== 2 ])
     for word, label in yago_dict.items():
       if self.cjk_detect(word):
         word = word.replace("_","")
@@ -630,8 +602,8 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
           new_yago_ontology[word] = label
 
     lst = list(new_yago_ontology.items())
-    json.dump(lst, open(f"{data_dir}/yago_ontology.json", "w", encoding="utf8"), indent=1)
-    os.system(f"cp {data_dir}/yago_ontology.json {shared_dir}")
+    json.dump(lst, open(f"{tmp_dir}/yago_ontology.json", "w", encoding="utf8"), indent=1)
+    os.system(f"cp {tmp_dir}/yago_ontology.json {tmp_dir}")
     return lst
 
   def create_yago_ontology(self):
@@ -641,16 +613,16 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
   def create_combined_cn_yago(self):
     self.create_cn_ontology()
     self.create_eng2multilang_dict()
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     if hasattr(self, 'ner2word') and self.ner2word: return
-    if os.path.exists(f"{shared_dir}/conceptnet_yago_combined.json"):
-      self.ner2word = json.load(open(f"{shared_dir}/conceptnet_yago_combined.json", "rb"))
-      self.yago2ner = [tuple(a) for a in json.load(open(f"{shared_dir}/yago2ner.json", "rb"))]
+    if os.path.exists(f"{tmp_dir}/conceptnet_yago_combined.json"):
+      self.ner2word = json.load(open(f"{tmp_dir}/conceptnet_yago_combined.json", "rb"))
+      self.yago2ner = [tuple(a) for a in json.load(open(f"{tmp_dir}/yago2ner.json", "rb"))]
       return
     
     mt5_tok = transformers.AutoTokenizer.from_pretrained("google/mt5-small")
 
-    cat2word_list = list(json.load(open(f"{shared_dir}/conceptnet_ontology_cat2word.json")).items())
+    cat2word_list = list(json.load(open(f"{tmp_dir}/conceptnet_ontology_cat2word.json")).items())
     word2ner = {}
     ner2word = {}
     #cat2ner_map = dict([ ('person', 'PUBLIC_FIGURE'), ('body', 'ANAT'), ('artifact', 'PRODUCT'), ('medicine', 'MEDICAL_THERAPY',), ('plant', 'PLANT'), ('animal', 'ANIMAL'),  ('location', 'LOCATION'),  ('language', 'LANGUAGE'), ('substance', 'SUBSTANCE'), ('state', 'DISEASE'), ('group', 'ORG'), ('time', 'DATE'), ('law', 'LAW'), ('food', 'FOOD'), ('quantity', 'QUANTITY')])
@@ -679,13 +651,13 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
     for word, label in word2ner.items():
       ner2word[label] = ner2word.get(label,[])+list(self.word2en[word])
     word2ner=None
-    json.dump(ner2word, open(f"{shared_dir}/conceptnet_yago_combined.json", "w", encoding="utf8"), indent=1)
-    json.dump(yago2ner, open(f"{shared_dir}/yago2ner.json", "w", encoding="utf8"), indent=1)
+    json.dump(ner2word, open(f"{tmp_dir}/conceptnet_yago_combined.json", "w", encoding="utf8"), indent=1)
+    json.dump(yago2ner, open(f"{tmp_dir}/yago2ner.json", "w", encoding="utf8"), indent=1)
     self.ner2word = ner2word
     self.yago2ner = yago2ner
 
   def save_cross_lingual_ontology(self, word2ner_file = "word2ner.json"):
-    shared_dir=self.shared_dir
+    tmp_dir=self.tmp_dir
     data_dir=self.data_dir
     self.create_eng2multilang_dict()
     self.create_combined_cn_yago()
@@ -936,9 +908,8 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
         nerbylangs[lang] = nerbylangs.get(lang, [])+ [label]
     self.word2ner = word2ner = list(set([(word.translate(trannum), label) for word, label in word2ner]))
     print ('num of items', len(word2ner))
-    os.system(f"mkdir -p {data_dir}")
-    json.dump(word2ner, open(f"{data_dir}/{word2ner_file}", "w", encoding="utf8"), indent=1)
-    os.system(f"mv {data_dir}/{word2ner_file} {shared_dir}/{word2ner_file}")
+    os.system(f"mkdir -p {tmp_dir}")
+    json.dump(word2ner, open(f"{tmp_dir}/{word2ner_file}", "w", encoding="utf8"), indent=1)
     self.add_to_ontology(word2ner)
     for lang in list(nerbylangs.keys()):
       nerbylangs[lang]= Counter(nerbylangs[lang]).most_common()
@@ -1103,14 +1074,14 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
 
   def load_ontology(self, word2ner_file=None):
     data_dir = self.data_dir
-    shared_dir = self.shared_dir
+    tmp_dir = self.tmp_dir
     if not os.path.exists(word2ner_file):
-      word2ner_file = f"{data_dir_dir}/{word2ner_file}"
+      word2ner_file = f"{tmp_dir}/{word2ner_file}"
     return json.load(open(word2ner_file, "rb").decode())
 
   def word2cat(self):
-    shared_dir = self.shared_dir
-    cat2word = json.load(open(f"{shared_dir}/conceptnet_ontology_cat2word.json", "rb").decode())
+    tmp_dir = self.tmp_dir
+    cat2word = json.load(open(f"{tmp_dir}/conceptnet_ontology_cat2word.json", "rb").decode())
     from collections import Counter
     lst = list(cat2word.items())
     lst.sort(key=lambda a: a[1], reverse=True)
@@ -1237,12 +1208,10 @@ class OntologyBuilder (OntologyManager, OntologyBuilderData):
 
 
 if __name__ == "__main__":  
-  data_dir = shared_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),  os.path.pardir, "data"))
+  data_dir = tmp_dir = None
   if "-s" in sys.argv:
-    shared_dir = sys.argv[sys.argv.index("-s")+1]
-  print (data_dir, shared_dir)
+    tmp_dir = sys.argv[sys.argv.index("-s")+1]
   if "-c" in sys.argv:
-    builder = OntologyBuilder(shared_dir=shared_dir, data_dir=data_dir)
+    builder = OntologyBuilder(tmp_dir=tmp_dir, data_dir=data_dir)
     rel2 = builder.save_cross_lingual_ontology()
-    print(rel2)
-    #builder.create_combined_cn_yago()
+
