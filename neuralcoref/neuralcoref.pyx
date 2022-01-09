@@ -271,11 +271,8 @@ def get_resolved(doc, clusters):
     resolved = list(tok.text_with_ws for tok in doc)
     for cluster in clusters:
         for coref in cluster:
-            # 1. Don't replace words with PRONOMINALS since they don't improve anything. 
             if coref != cluster.main and get_span_type(cluster.main) != MENTION_TYPE["PRONOMINAL"]:
-                # 2. Don't replace "Determiners" since it just creates grammatcal errors.
                 has_det = any(tok.pos_ == 'DET' for tok in coref)
-                print (coref, has_det)
                 if not has_det:
                     resolved[coref.start] = cluster.main.text + doc[coref.end-1].whitespace_
                     for i in range(coref.start+1, coref.end):
