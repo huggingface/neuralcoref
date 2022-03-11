@@ -228,7 +228,7 @@ class NCDataset(Dataset):
             [self.mentions[idx.item()][0][np.newaxis, :] for idx in pairs_ant_index]
         )
         ant_features = np.zeros((pairs_length, SIZE_FS - SIZE_GENRE))
-        ant_features[:, ant_features_raw[:, 0]] = 1
+        ant_features[np.arange(pairs_length), ant_features_raw[:, 0]] = 1
         ant_features[:, 4:15] = encode_distance(ant_features_raw[:, 1])
         ant_features[:, 15] = ant_features_raw[:, 2].astype(float) / ant_features_raw[
             :, 3
