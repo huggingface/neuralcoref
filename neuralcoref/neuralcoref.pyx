@@ -893,7 +893,7 @@ cdef class NeuralCoref(object):
         cdef int n = 0
         embed_arr = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
         for token in span:
-            if token.lower not in PUNCTS:
+            if not inside(token.lower, self.hashes.puncts):
                 n += 1
                 embed_vector = self.get_word_embedding(token, tuned=False)
                 embed_arr = embed_arr + embed_vector
