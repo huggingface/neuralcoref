@@ -714,7 +714,7 @@ cdef class NeuralCoref(object):
             # if debug: print("Build single features and pair features arrays")
             # ''' Build single features and pair features arrays '''
             doc_c = doc.c
-            doc_embedding = numpy.zeros(SIZE_EMBEDDING, dtype='float32') # self.embeds.get_average_embedding(doc.c, 0, doc.length + 1, self.hashes.puncts)
+            doc_embedding = self.get_doc_embedding(doc)
             doc_embed = doc_embedding
             for i in range(n_mentions):
                 s_inp_arr[i, :SGNL_FEATS_0] = self.get_mention_embeddings(mentions[i], doc_embedding) # Set embeddings
@@ -871,6 +871,14 @@ cdef class NeuralCoref(object):
 
     def normalize(self, Token token):
         return self.hashes.digit_word if token.is_digit else token.lower
+
+    def get_doc_embedding(self, Doc doc):
+        embed_arr = numpy.zeros(self.static_vectors.shape[1], dtype='float32')
+        for sent in doc.sents:
+            utt_embed = self.get_average_embedding(sent)
+            embed_arr += utt_embed
+        embed_arr = numpy.divide(embed_arr, float(max(len(list(doc.sents)), 1)))
+        return embed_arr
 
     def get_static(self, hash_t word):
         return self.static_vectors[word] if word in self.static_vectors else self.static_vectors[self.hashes.unknown_word]
