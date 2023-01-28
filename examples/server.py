@@ -13,6 +13,17 @@ import neuralcoref
 unicode_ = str
 
 
+def spans_to_str(dct):
+    """Converts spacy.tokens.span.Span objects in the dictionary keys to strings"""
+    new_dict = {}
+    for (key, value) in dct.items():
+        keyd = str(key)
+        if isinstance(value, dict):
+            new_dict[keyd] = spans_to_str(value)
+        else:
+            new_dict[keyd] = value
+    return new_dict
+
 class AllResource(object):
     def __init__(self):
         self.nlp = spacy.load("en")
@@ -48,6 +59,7 @@ class AllResource(object):
                 self.response["mentions"] = mentions
                 self.response["clusters"] = clusters
                 self.response["resolved"] = resolved
+                self.response["scores"] = spans_to_str(doc._.coref_scores)
 
         resp.body = json.dumps(self.response)
         resp.content_type = "application/json"
