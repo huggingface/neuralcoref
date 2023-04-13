@@ -49,7 +49,7 @@ Here is an example of how you can install SpaCy and a (small) English model for 
 
 ```bash
 pip install -U spacy
-python -m spacy download en
+python -m spacy download en_core_web_sm
 ```
 
 ### Install NeuralCoref from source
